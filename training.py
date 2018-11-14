@@ -1,4 +1,7 @@
+"""Utilities to train a model."""
+
 from abc import ABCMeta, abstractmethod
+import argparse
 import logging
 import os
 import re
@@ -8,6 +11,41 @@ import torch as th
 
 
 LOG = logging.getLogger(__name__)
+
+
+class BasicArgumentParser(argparse.ArgumentParser):
+  """A basic argument parser with commonly used training options."""
+  def __init__(self):
+    super(BasicArgumentParser, self).__init__()
+
+    self.add_argument("--data", required=True, help="")
+    self.add_argument("--checkpoint_dir", required=True, help="Output directory where checkpoints are saved")
+
+    self.add_argument("--val_data", help="")
+
+    self.add_argument("--lr", default=1e-4, help="Learning rate for the optimizer")
+    self.add_argument("--bs", default=1, help="Batch size")
+    self.add_argument("--num_epochs", help="Number of epochs to train for")
+
+    self.add_argument("--experiment_log", help="csv file in which we log our experiments")
+
+    self.add_argument("--cuda", action="store_true", dest="cuda", help="Force GPU")
+    self.add_argument("--no-cuda", action="store_false", dest="cuda", help="Force CPU")
+
+    self.set_defaults(cuda=th.cuda.is_available())
+
+
+def set_logger(debug=False):
+  """Set the default logging level and log format."""
+  log_level = logging.INFO
+  prefix = "[%(process)d] %(levelname)s %(name)s"
+  suffix = " | %(message)s"
+  if debug:
+    log_level = logging.DEBUG
+    prefix += " %(filename)s:%(lineno)s"
+  logging.basicConfig(
+        level=log_level,
+        format=prefix+suffix)
 
 
 class ModelInterface(metaclass=ABCMeta):
