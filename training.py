@@ -23,14 +23,17 @@ class BasicArgumentParser(argparse.ArgumentParser):
 
     self.add_argument("--val_data", help="")
 
-    self.add_argument("--lr", default=1e-4, help="Learning rate for the optimizer")
-    self.add_argument("--bs", default=1, help="Batch size")
-    self.add_argument("--num_epochs", help="Number of epochs to train for")
+    self.add_argument("--lr", type=float, default=1e-4, help="Learning rate for the optimizer")
+    self.add_argument("--bs", type=int, default=4, help="Batch size")
+    self.add_argument("--num_epochs", type=int, help="Number of epochs to train for")
 
     self.add_argument("--experiment_log", help="csv file in which we log our experiments")
 
     self.add_argument("--cuda", action="store_true", dest="cuda", help="Force GPU")
     self.add_argument("--no-cuda", action="store_false", dest="cuda", help="Force CPU")
+
+    self.add_argument("--env", default="main", help="Visdom environment")
+    self.add_argument("--port", default=8097, type=int, help="Visdom server port")
 
     self.set_defaults(cuda=th.cuda.is_available())
 
@@ -271,7 +274,7 @@ class Checkpointer(object):
 
   EXTENSION = ".pth"
 
-  def __init__(self, root, model=None, optimizer=None, meta=None):
+  def __init__(self, root, model=None, optimizer=None, meta=None, prefix=None):
     self.root = root
     self.model = model
     self.meta = meta
@@ -292,6 +295,7 @@ class Checkpointer(object):
       path (string): relative path to the file being saved (without extension).
       extras (dict): extra user-provided information to be saved with the model.
     """
+
     if self.optimizer is None:
       optimizer_state = None
     else:

@@ -285,7 +285,7 @@ class CheckpointingCallback(Callback):
   PERIODIC_PREFIX = "periodic_"
   EPOCH_PREFIX = "epoch_"
 
-  def __init__(self, checkpointer, interval=600, max_files=5):
+  def __init__(self, checkpointer, interval=600, max_files=5, prefix=None):
     super(CheckpointingCallback, self).__init__()
     self.checkpointer = checkpointer
     self.interval = interval
@@ -293,16 +293,21 @@ class CheckpointingCallback(Callback):
 
     self.last_checkpoint_time = time.time()
 
+    self.prefix = ""
+    if prefix is not None:
+      self.prefix = prefix
+
+
   def epoch_end(self):
     """Save a checkpoint at the end of each epoch."""
 
     super(CheckpointingCallback, self).epoch_end()
-    self.checkpointer.save("{}{}".format(CheckpointingCallback.EPOCH_PREFIX,
+    self.checkpointer.save("{}{}{}".format(self.prefix, CheckpointingCallback.EPOCH_PREFIX,
                                          self.epoch))
 
   def training_end(self):
     super(CheckpointingCallback, self).training_end()
-    self.checkpointer.save("training_end")
+    self.checkpointer.save("{}training_end".format(self.prefix))
 
   def batch_end(self, batch_data, fwd_result, bwd_result):
     """Save a periodic checkpoint if requested."""
@@ -313,17 +318,17 @@ class CheckpointingCallback(Callback):
     if self.interval is None:  # We skip periodic checkpoints
       return
 
-    LOG.debug("Periodic checkpoint")
-
     now = time.time()
 
     delta = now - self.last_checkpoint_time
 
     if delta < self.interval:  # last checkpoint is too recent
       return
+
+    LOG.debug("Periodic checkpoint")
     
     # TODO: add epoch in extras
-    filename = '{}{}'.format(CheckpointingCallback.PERIODIC_PREFIX,
+    filename = "{}{}{}".format(self.prefix, CheckpointingCallback.PERIODIC_PREFIX,
       time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime()))
     self.checkpointer.save(filename)
 
@@ -337,7 +342,7 @@ class CheckpointingCallback(Callback):
     chkpts = self.checkpointer.sorted_checkpoints()
     p_chkpts = []
     for c in chkpts:
-      if c.startswith(CheckpointingCallback.PERIODIC_PREFIX):
+      if c.startswith(self.prefix + CheckpointingCallback.PERIODIC_PREFIX):
         p_chkpts.append(c)
 
     if len(p_chkpts) > self.max_files:
