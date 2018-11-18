@@ -10,6 +10,7 @@ import torch.nn.functional as F
 
 from torch.autograd import Variable
 
+
 class _ConvModule(nn.Module):
   """Basic convolution module with conv + norm(optional) + activation(optional).
 
@@ -90,13 +91,14 @@ class ConvChain(nn.Module):
   Args:
     n_in(int): number of input channels.
     n_out(int): number of output channels.
-    ksize(int): size of the convolution kernel (square).
-    width(int): number of features channels in the intermediate layers.
-    strides(list of int)
+    ksize(int or list of int): size of the convolution kernel (square).
+    width(int or list of int): number of features channels in the intermediate layers.
+    depth(int): number of layers
+    strides(list of int): stride between kernels. If None, defaults to 1 for all.
     pad(bool): if True, zero pad the convolutions to maintain a constant size.
     activation(str): nonlinear activation function between convolutions.
     norm_layer(str): normalization to apply between the convolution modules.
-    out_activation(): activation function applied to the output, defaults to linear (none).
+    out_activation(str): activation function applied to the output, defaults to linear (none).
   """
   def __init__(self, n_in, n_out, ksize=3, width=64, depth=3, strides=None, pad=True,
                activation="relu", norm_layer=None, out_activation=None):
@@ -122,7 +124,7 @@ class ConvChain(nn.Module):
       _in = _in + [width]*(depth-1)
       _out = [width]*(depth-1) + _out
     elif isinstance(width, list):
-      assert depth > 2 and len(width) == depth-1, "Needs at least three layers to specify width with a list."
+      assert depth > 1 and len(width) == depth-1, "Needs at least two layers to specify width with a list."
       _in = _in + width
       _out = width + _out
 
@@ -154,23 +156,62 @@ class FCChain(nn.Module):
   Args:
     n_in(int): number of input channels.
     n_out(int): number of output channels.
-    width(int or list of ints): number of features channels in the intermediate
-      layers. Specify an int for a uniform width, or a list for more control.
-    depth(int): number of layers.
-    activation(): nonlinear activation function between convolutions.
-    pad(bool): if True, zero pad the convolutions to maintain a constant size.
-    norm_layer(): normalization to apply between the convolution modules.
-    out_activation(): activation function applied to the output, defaults to linear (none).
+    width(int or list of int): number of features channels in the intermediate layers.
+    depth(int): number of layers
+    activation(str): nonlinear activation function between convolutions.
+    dropout(float or list of float): dropout ratio if defined, default to None: no dropout.
+    out_activation(str): activation function applied to the output, defaults to linear (none).
   """
-  def __init__(self, n_in, n_out, ksize=3, width=64, depth=3, pad=True,
-               activation="relu", norm_layer=None, out_activation=None):
-    pass
+  def __init__(self, n_in, n_out, width=64, depth=3, activation="relu",
+               dropout=None, out_activation=None):
+    super(FCChain, self).__init__()
+
+    assert isinstance(n_in, int) and n_in > 0, "Input channels should be a positive integer"
+    assert isinstance(n_out, int) and n_out > 0, "Output channels should be a positive integer"
+    assert isinstance(depth, int) and depth > 0, "Depth should be a positive integer"
+    assert isinstance(width, int) or isinstance(width, list), "Width should be a list or an int"
+
+    _in = [n_in]
+    _out = [n_out]
+
+    if isinstance(width, int):
+      _in = _in + [width]*(depth-1)
+      _out = [width]*(depth-1) + _out
+    elif isinstance(width, list):
+      assert depth > 1 and len(width) == depth-1, "Needs at least two layers to specify width with a list. Do no specify out"
+      _in = _in + width
+      _out = width + _out
+
+    _activations = [activation]*(depth-1) + [out_activation]
+
+    if dropout is not None:
+      assert isinstance(dropout, float) or isinstance(dropout, list), "Dropout should be a float or a list of floats"
+
+    if dropout is None or isinstance(dropout, float):
+      _dropout = [None] + [dropout]*(depth-2) + [None]  # dont do dropout on in/out layers
+    elif isinstance(dropout, list):
+      assert depth > 2 and len(dropout) == depth-2, "Needs at least three layers to specify dropout with a list (do not specify in/out)."
+      _dropout = [None] + dropout + [None]  # dont do dropout on in/out layers
+
+    # Core processing layers, no norm at the first layer
+    for lvl in range(depth):
+      self.add_module(
+        "fc{}".format(lvl),
+        _FCModule(_in[lvl], _out[lvl], activation=_activations[lvl],
+                  dropout=_dropout[lvl]))
 
   def forward(self, x):
     for m in self.children():
       x = m(x)
     return x
 
+
+class Autoencoder(nn.Module):
+  pass
+
+
+class UNet(nn.Module):
+  pass
 
 def _get_norm_layer(norm_layer, channels):
   valid = ["instance", "batch"]
