@@ -1,18 +1,16 @@
 """Callbacks that can be added to a model trainer's maiin loop."""
 
-# TODO: frequency parameter for loggers
-
 import abc
 import logging
 import time
 
-import numpy as np
-import pandas as pd
 from tqdm import tqdm
 import visdom
 
 
 LOG = logging.getLogger(__name__)
+
+__all__ = ["Callback"]
 
 
 class Callback(object):
@@ -58,54 +56,6 @@ class Callback(object):
         pass
 
 
-# TODO
-class ExperimentLoggerCallback(Callback):
-    def __init__(self, fname, meta=None):
-        super(ExperimentLoggerCallback, self).__init__()
-
-    def training_start(self, dataloader):
-        super(ExperimentLoggerCallback, self).training_start(dataloader)
-        print("logging experiment with", self.datasize)
-
-    def training_end(self):
-        super(ExperimentLoggerCallback, self).training_end()
-        print("end logging experiment", self.epoch, self.batch)
-
-
-class WebsiteGeneratorCallback(Callback):
-    """"""
-    pass
-
-# TODO
-
-
-class CSVLoggingCallback(Callback):
-    """A callback that logs scalar quantities to a .csv file."""
-    pass
-
-#   def __init__(self, directory, keys, filename="log.csv"):
-#     if directory.startswith('~'):
-#        directory = os.path.expanduser(directory)
-#     os.makedirs(directory, exist_ok=True)
-#     self.logfile = open(os.path.join(directory, filename), 'a')
-#     self.writer = csv.DictWriter(self.logfile, keys)
-#     # TODO: only write header once
-#     # self.writer.writeheader()
-#
-#     # TODO: make sure filename is csv, add max entries and list
-#
-#     # TODO: add periodic flush, cycles thru multiple log files as write fill up
-#
-#   def __del__(self):
-#     # graceful closing of file
-#     if self.logfile:
-#       self.logfile.close()
-#
-#   def log(self, **kwargs):
-#     """Write a log entry from a dictionary"""
-#     self.writer.writerow(kwargs)
-
-
 class KeyedCallback(Callback):
     """An abstract Callback that performs the same action for all keys in a list.
 
@@ -113,16 +63,22 @@ class KeyedCallback(Callback):
     validation_data) produced by a ModelInterface.
 
     Args:
-      keys (list of str): list of keys whose values will be logged during training.
+      keys (list of str): list of keys whose values will be logged during training. Defaults
+        to ["loss"].
       val_keys (list of str): list of keys whose values will be logged during validation
     """
 
-    def __init__(self, keys=["loss"], val_keys=None):
+    def __init__(self, keys=None, val_keys=None):
         super(KeyedCallback, self).__init__()
-        self.keys = keys
-        self.val_keys = val_keys
-        if self.val_keys is None:
-            self.val_keys = keys
+        if keys is None:
+            self.keys = ["loss"]
+        else:
+            self.keys = keys
+
+        if val_keys is None:
+            self.val_keys = self.keys
+        else:
+            self.val_keys = val_keys
 
 
 class VisdomLoggingCallback(KeyedCallback):
@@ -131,11 +87,12 @@ class VisdomLoggingCallback(KeyedCallback):
     Args:
       keys (list of str): list of keys whose values will be logged during training.
       val_keys (list of str): list of keys whose values will be logged during validation
+      frequency(int): number of steps between display updates.
       port (int): Port of the Visdom server to log to.
       env (string): name of the Visdom environment to log to.
     """
 
-    def __init__(self, keys=["loss"], val_keys=["loss"], port=8097, env="main"):
+    def __init__(self, keys=None, val_keys=None, frequency=100, port=8097, env="main"):
         super(VisdomLoggingCallback, self).__init__(
             keys=keys, val_keys=val_keys)
         self._api = visdom.Visdom(port=port, env=env)
@@ -149,14 +106,24 @@ class VisdomLoggingCallback(KeyedCallback):
             self._opts[k] = {
                 "legend": ["train", "val"], "title": k, "xlabel": "epoch", "ylabel": k}
 
+        self._step = 0
+        self.frequency = frequency
+
     def batch_end(self, batch_data, fwd, bwd):
         super(VisdomLoggingCallback, self).batch_end(batch_data, fwd, bwd)
+
+        if self._step % self.frequency != 0:
+            self._step += 1
+            return
+        self._step = 0
 
         t = self.batch / self.datasize + self.epoch
 
         for k in self.keys:
             self._api.line([bwd[k]], [t], update="append", win=k, name="train",
                            opts=self._opts[k])
+
+        self._step += 1
 
     def validation_end(self, val_data):
         super(VisdomLoggingCallback, self).validation_end(val_data)
@@ -180,13 +147,16 @@ class LoggingCallback(KeyedCallback):
 
     TABSTOPS = 2
 
-    def __init__(self, name, keys=["loss"], val_keys=None):
+    def __init__(self, name, keys=None, val_keys=None, frequency=100):
         super(LoggingCallback, self).__init__(keys=keys, val_keys=val_keys)
 
         self.log = logging.getLogger(name)
         self.log.setLevel(logging.INFO)
 
         self.m_indent = 0
+
+        self._step = 0
+        self.frequency = frequency
 
     def __print(self, s):
         self.log.info(self.m_indent*LoggingCallback.TABSTOPS*' ' + s)
@@ -225,16 +195,24 @@ class LoggingCallback(KeyedCallback):
     def batch_end(self, batch_data, fwd, bwd_data):
         """Logs training advancement Epoch.Batch"""
         super(LoggingCallback, self).batch_end(batch_data, fwd, bwd_data)
+
+        if self._step % self.frequency != 0:
+            self._step += 1
+            return
+        self._step = 0
+
         s = "{}.{} | ".format(self.epoch + 1, batch + 1)
         for k in self.keys:
             s += "{} = {:.2f} ".format(k, bwd_data[k])
         self.__print(s)
 
+        self._step += 1
+
 
 class ProgressBarCallback(KeyedCallback):
-    TABSTOPS = 2
+    """A progress bar optimization logger."""
 
-    def __init__(self, keys=["loss"], val_keys=None):
+    def __init__(self, keys=None, val_keys=None):
         super(ProgressBarCallback, self).__init__(keys=keys, val_keys=val_keys)
         self.pbar = None
 
@@ -273,6 +251,8 @@ class ProgressBarCallback(KeyedCallback):
         self.pbar.update(1)
         d = {k: bwd_data[k] for k in self.keys}
         self.pbar.set_postfix(d)
+
+    TABSTOPS = 2
 
 
 class CheckpointingCallback(Callback):
@@ -388,3 +368,27 @@ class ImageDisplayCallback(Callback, abc.ABC):
         viz = self.visualized_image(batch, fwd_result, bwd_result)
         self._api.images(viz, win="images", opts=opts)
         self.step += 1
+
+
+class ExperimentLoggerCallback(Callback):
+    """A callback that logs experiment parameters in a log."""
+    # TODO
+
+    def __init__(self, fname, meta=None):
+        super(ExperimentLoggerCallback, self).__init__()
+
+    def training_start(self, dataloader):
+        super(ExperimentLoggerCallback, self).training_start(dataloader)
+        print("logging experiment with", self.datasize)
+
+    def training_end(self):
+        super(ExperimentLoggerCallback, self).training_end()
+        print("end logging experiment", self.epoch, self.batch)
+
+
+class CSVLoggingCallback(Callback):
+    """A callback that logs scalar quantities to a .csv file."""
+    # TODO
+    pass
+
+

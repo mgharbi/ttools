@@ -1,7 +1,8 @@
+"""Test the Trainer module."""
+
 import unittest
 
 import numpy as np
-import torch as th
 import torch.utils.data
 
 from .. import ModelInterface
@@ -10,6 +11,7 @@ from .. import Callback
 
 
 class DummyInterface(ModelInterface):
+    """Simple model interface used for testing."""
     def __init__(self):
         super(DummyInterface, self).__init__()
         self.fwd = 0
@@ -41,6 +43,8 @@ class DummyInterface(ModelInterface):
 
 
 class DummyCallback(Callback):
+    """Simple dummy callback used for testing."""
+
     def __init__(self):
         super(DummyCallback, self).__init__()
         self.batch_ends = 0
@@ -80,7 +84,8 @@ class DummyCallback(Callback):
         self.val_ends += 1
 
 
-class TestingData(torch.utils.data.Dataset):
+class DummyData(torch.utils.data.Dataset):
+    """Dummy data for testing."""
     def __getitem__(self, idx):
         x = np.random.randn()
         y = np.random.randn()
@@ -92,7 +97,7 @@ class TestingData(torch.utils.data.Dataset):
 
 class TestTrainer(unittest.TestCase):
     def setUp(self):
-        self.data = TestingData()
+        self.data = DummyData()
         self.loader = torch.utils.data.DataLoader(self.data, batch_size=1)
         self.interface = DummyInterface()
         self.callback = DummyCallback()
