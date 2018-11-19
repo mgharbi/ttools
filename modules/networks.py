@@ -13,6 +13,95 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 
+class FCModule(nn.Module):
+  """Basic fully connected module with optional dropout.
+
+  Args:
+    n_in(int): number of input channels.
+    n_out(int): number of output channels.
+    activation(str): nonlinear activation function.
+    dropout(float): dropout ratio if defined, default to None: no dropout.
+  """
+  def __init__(self, n_in, n_out, activation="relu", dropout=None):
+    super(FCModule, self).__init__()
+
+    assert isinstance(n_in, int) and n_in > 0, "Input channels should be a positive integer"
+    assert isinstance(n_out, int) and n_out > 0, "Output channels should be a positive integer"
+
+    self.add_module("fc", nn.Linear(n_in, n_out))
+
+    if activation is not None:
+      self.add_module("activation", _get_activation(activation))
+
+    if dropout is not None:
+      self.add_module("dropout", nn.Dropout(dropout, inplace=True))
+
+
+    # Initialize parameters
+    _init_fc_or_conv(self.fc, activation)
+
+  def forward(self, x):
+    for c in self.children():
+      x = c(x)
+    return x
+
+
+class FCChain(nn.Module):
+  """Linear chain of fully connected layers.
+
+  Args:
+    n_in(int): number of input channels.
+    n_out(int): number of output channels.
+    width(int or list of int): number of features channels in the intermediate layers.
+    depth(int): number of layers
+    activation(str): nonlinear activation function between convolutions.
+    dropout(float or list of float): dropout ratio if defined, default to None: no dropout.
+    out_activation(str): activation function applied to the output, defaults to linear (none).
+  """
+  def __init__(self, n_in, n_out, width=64, depth=3, activation="relu",
+               dropout=None, out_activation=None):
+    super(FCChain, self).__init__()
+
+    assert isinstance(n_in, int) and n_in > 0, "Input channels should be a positive integer"
+    assert isinstance(n_out, int) and n_out > 0, "Output channels should be a positive integer"
+    assert isinstance(depth, int) and depth > 0, "Depth should be a positive integer"
+    assert isinstance(width, int) or isinstance(width, list), "Width should be a list or an int"
+
+    _in = [n_in]
+    _out = [n_out]
+
+    if isinstance(width, int):
+      _in = _in + [width]*(depth-1)
+      _out = [width]*(depth-1) + _out
+    elif isinstance(width, list):
+      assert depth > 1 and len(width) == depth-1, "Needs at least two layers to specify width with a list. Do no specify out"
+      _in = _in + width
+      _out = width + _out
+
+    _activations = [activation]*(depth-1) + [out_activation]
+
+    if dropout is not None:
+      assert isinstance(dropout, float) or isinstance(dropout, list), "Dropout should be a float or a list of floats"
+
+    if dropout is None or isinstance(dropout, float):
+      _dropout = [None] + [dropout]*(depth-2) + [None]  # dont do dropout on in/out layers
+    elif isinstance(dropout, list):
+      assert depth > 2 and len(dropout) == depth-2, "Needs at least three layers to specify dropout with a list (do not specify in/out)."
+      _dropout = [None] + dropout + [None]  # dont do dropout on in/out layers
+
+    # Core processing layers, no norm at the first layer
+    for lvl in range(depth):
+      self.add_module(
+        "fc{}".format(lvl),
+        FCModule(_in[lvl], _out[lvl], activation=_activations[lvl],
+                  dropout=_dropout[lvl]))
+
+  def forward(self, x):
+    for m in self.children():
+      x = m(x)
+    return x
+
+
 class ConvModule(nn.Module):
   """Basic convolution module with conv + norm(optional) + activation(optional).
 
@@ -47,39 +136,6 @@ class ConvModule(nn.Module):
 
     # Initialize parameters
     _init_fc_or_conv(self.conv, activation)
-
-  def forward(self, x):
-    for c in self.children():
-      x = c(x)
-    return x
-
-
-class FCModule(nn.Module):
-  """Basic fully connected module with optional dropout.
-
-  Args:
-    n_in(int): number of input channels.
-    n_out(int): number of output channels.
-    activation(str): nonlinear activation function.
-    dropout(float): dropout ratio if defined, default to None: no dropout.
-  """
-  def __init__(self, n_in, n_out, activation="relu", dropout=None):
-    super(FCModule, self).__init__()
-
-    assert isinstance(n_in, int) and n_in > 0, "Input channels should be a positive integer"
-    assert isinstance(n_out, int) and n_out > 0, "Output channels should be a positive integer"
-
-    self.add_module("fc", nn.Linear(n_in, n_out))
-
-    if activation is not None:
-      self.add_module("activation", _get_activation(activation))
-
-    if dropout is not None:
-      self.add_module("dropout", nn.Dropout(dropout, inplace=True))
-
-
-    # Initialize parameters
-    _init_fc_or_conv(self.fc, activation)
 
   def forward(self, x):
     for c in self.children():
@@ -145,62 +201,6 @@ class ConvChain(nn.Module):
         "conv{}".format(lvl),
         ConvModule(_in[lvl], _out[lvl], _ksizes[lvl], stride=_strides[lvl], pad=pad,
                     activation=_activations[lvl], norm_layer=_norms[lvl]))
-
-  def forward(self, x):
-    for m in self.children():
-      x = m(x)
-    return x
-
-
-class FCChain(nn.Module):
-  """Linear chain of fully connected layers.
-
-  Args:
-    n_in(int): number of input channels.
-    n_out(int): number of output channels.
-    width(int or list of int): number of features channels in the intermediate layers.
-    depth(int): number of layers
-    activation(str): nonlinear activation function between convolutions.
-    dropout(float or list of float): dropout ratio if defined, default to None: no dropout.
-    out_activation(str): activation function applied to the output, defaults to linear (none).
-  """
-  def __init__(self, n_in, n_out, width=64, depth=3, activation="relu",
-               dropout=None, out_activation=None):
-    super(FCChain, self).__init__()
-
-    assert isinstance(n_in, int) and n_in > 0, "Input channels should be a positive integer"
-    assert isinstance(n_out, int) and n_out > 0, "Output channels should be a positive integer"
-    assert isinstance(depth, int) and depth > 0, "Depth should be a positive integer"
-    assert isinstance(width, int) or isinstance(width, list), "Width should be a list or an int"
-
-    _in = [n_in]
-    _out = [n_out]
-
-    if isinstance(width, int):
-      _in = _in + [width]*(depth-1)
-      _out = [width]*(depth-1) + _out
-    elif isinstance(width, list):
-      assert depth > 1 and len(width) == depth-1, "Needs at least two layers to specify width with a list. Do no specify out"
-      _in = _in + width
-      _out = width + _out
-
-    _activations = [activation]*(depth-1) + [out_activation]
-
-    if dropout is not None:
-      assert isinstance(dropout, float) or isinstance(dropout, list), "Dropout should be a float or a list of floats"
-
-    if dropout is None or isinstance(dropout, float):
-      _dropout = [None] + [dropout]*(depth-2) + [None]  # dont do dropout on in/out layers
-    elif isinstance(dropout, list):
-      assert depth > 2 and len(dropout) == depth-2, "Needs at least three layers to specify dropout with a list (do not specify in/out)."
-      _dropout = [None] + dropout + [None]  # dont do dropout on in/out layers
-
-    # Core processing layers, no norm at the first layer
-    for lvl in range(depth):
-      self.add_module(
-        "fc{}".format(lvl),
-        FCModule(_in[lvl], _out[lvl], activation=_activations[lvl],
-                  dropout=_dropout[lvl]))
 
   def forward(self, x):
     for m in self.children():
