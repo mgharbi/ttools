@@ -350,24 +350,24 @@ class ImageDisplayCallback(Callback, abc.ABC):
         super(ImageDisplayCallback, self).__init__()
         self.freq = frequency
         self._api = visdom.Visdom(port=port, env=env)
-        self.step = 0
+        self._step = 0
 
     @abc.abstractmethod
     def visualized_image(self, batch, fwd_result, bwd_result):
         pass
 
     def batch_end(self, batch, fwd_result, bwd_result):
-        if self.step % self.freq != 0:
-            self.step += 1
+        if self._step % self.freq != 0:
+            self._step += 1
             return
 
-        self.step = 0
+        self._step = 0
 
         opts = {"caption": "Epoch {}, batch {}".format(self.epoch, self.batch)}
 
         viz = self.visualized_image(batch, fwd_result, bwd_result)
         self._api.images(viz, win="images", opts=opts)
-        self.step += 1
+        self._step += 1
 
 
 class ExperimentLoggerCallback(Callback):
