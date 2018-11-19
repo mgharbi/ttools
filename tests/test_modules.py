@@ -5,6 +5,7 @@ import torch.nn as nn
 
 from ..modules import networks
 
+
 class TestConvModule(unittest.TestCase):
   def setUp(self):
     self.bs = 1
@@ -242,3 +243,45 @@ class TestFCChain(unittest.TestCase):
     print(fc)
     self.assertEqual(fc.fc1.dropout.p, 0.2)
     self.assertEqual(len(list(fc.children())), 3)
+
+
+class TestDownConvChain(unittest.TestCase):
+  def setUp(self):
+    self.bs = 1
+    self.c = 3
+    self.c_out = 4
+    self.h = 32
+    self.w = 32
+    self.in_data = th.ones(self.bs, self.c, self.h, self.w)
+
+  def test_default(self):
+    w = 32
+    k = 3
+    cv = networks.DownConvChain(self.c, self.c_out, base_width=32, num_levels=3,
+                                convs_per_level=2)
+
+    print(cv)
+
+    # self.assertListEqual(list(cv.conv0.conv.weight.shape), [w, self.c, k, k])
+    # self.assertListEqual(list(cv.conv1.conv.weight.shape), [w, w, k, k])
+    # self.assertListEqual(list(cv.conv2.conv.weight.shape), [w, w, k, k])
+    # self.assertListEqual(list(cv.conv3.conv.weight.shape), [w, w, k, k])
+    # self.assertListEqual(list(cv.conv4.conv.weight.shape), [self.c_out, w, k, k])
+    # self.assertRaises(AttributeError, getattr, cv, "conv5")
+    # self.assertEqual(len(list(cv.children())), 5)
+    #
+    # self.assertEqual(len(list(cv.conv0.children())), 2)
+    # self.assertEqual(len(list(cv.conv1.children())), 2)
+    # self.assertEqual(len(list(cv.conv2.children())), 2)
+    # self.assertEqual(len(list(cv.conv3.children())), 2)
+    # self.assertEqual(len(list(cv.conv4.children())), 1)
+    #
+    # out_ = cv(self.in_data)
+    # self.assertListEqual(list(out_.shape), [self.bs, self.c_out, self.h, self.w])
+
+  def test_variable_increase(self):
+    pass
+
+  def test_variable_num_convs(self):
+    pass
+    

@@ -145,9 +145,6 @@ class Trainer(object):
       progresses.
   """
 
-  class TrainerInterrupt(Exception):
-    pass
-
   def __init__(self, interface):
     super(Trainer, self).__init__()
     self.callbacks = []
