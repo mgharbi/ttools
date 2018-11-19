@@ -1,68 +1,70 @@
 def read_pfm(path):
-  with open(path, 'rb') as fid:
-    identifier = fid.readline().strip()
-    if identifier == b'PF':  # color
-      nchans = 3
-    elif identifier == b'Pf':  # gray
-      nchans = 1
-    else:
-      raise ValueError("Unknown PFM identifier {}".format(identifier))
+    with open(path, 'rb') as fid:
+        identifier = fid.readline().strip()
+        if identifier == b'PF':  # color
+            nchans = 3
+        elif identifier == b'Pf':  # gray
+            nchans = 1
+        else:
+            raise ValueError("Unknown PFM identifier {}".format(identifier))
 
-    dimensions = fid.readline().strip()
-    width, height = [int(x) for x in dimensions.split()]
-    endianness = fid.readline().strip()
+        dimensions = fid.readline().strip()
+        width, height = [int(x) for x in dimensions.split()]
+        endianness = fid.readline().strip()
 
-    data = np.fromfile(fid, dtype=np.float32, count=width*height*nchans)
-    data = np.reshape(data, (height, width, nchans))
+        data = np.fromfile(fid, dtype=np.float32, count=width*height*nchans)
+        data = np.reshape(data, (height, width, nchans))
 
-    data[np.isnan(data)] = 0.0
+        data[np.isnan(data)] = 0.0
 
-    return data
+        return data
+
 
 def read_ppm(path):
-  with open(path, 'rb') as fid:
-    identifier = fid.readline().strip()
-    if identifier == b'P6':  # color
-      nchans = 3
-    # elif identifier == b'Pf':  # gray
-    #   nchans = 1
-    else:
-      raise ValueError("Unknown PFM identifier {}".format(identifier))
+    with open(path, 'rb') as fid:
+        identifier = fid.readline().strip()
+        if identifier == b'P6':  # color
+            nchans = 3
+        # elif identifier == b'Pf':  # gray
+        #   nchans = 1
+        else:
+            raise ValueError("Unknown PFM identifier {}".format(identifier))
 
-    dimensions = fid.readline().strip().split()
-    if len(dimensions) != 2:
-      dimensions += fid.readline().strip().split()
-    width, height = [int(x) for x in dimensions]
-    maxval = int(fid.readline().strip())
+        dimensions = fid.readline().strip().split()
+        if len(dimensions) != 2:
+            dimensions += fid.readline().strip().split()
+        width, height = [int(x) for x in dimensions]
+        maxval = int(fid.readline().strip())
 
-    data = np.fromfile(fid, dtype=np.uint16, count=width*height*nchans)
-    data.byteswap(inplace=True)
-    data = np.reshape(data, (height, width, nchans))
+        data = np.fromfile(fid, dtype=np.uint16, count=width*height*nchans)
+        data.byteswap(inplace=True)
+        data = np.reshape(data, (height, width, nchans))
 
-    data = data.astype(np.float32) / (1.0*maxval)
+        data = data.astype(np.float32) / (1.0*maxval)
 
-    data[np.isnan(data)] = 0.0
+        data[np.isnan(data)] = 0.0
 
-    # import ipdb; ipdb.set_trace()
+        # import ipdb; ipdb.set_trace()
 
-    return data
+        return data
+
 
 def write_pfm(path, im):
-  assert im.dtype == np.float32, "pfm image should be float32"
-  height, width, nchans = im.shape
-  with open(path, 'wb') as fid:
-    if nchans == 1:
-      fid.write(b'Pf\n')
-    elif nchans == 3:
-      fid.write(b'PF\n')
-    else:
-      raise ValueError("Unknown channel count {}".format(nchans))
+    assert im.dtype == np.float32, "pfm image should be float32"
+    height, width, nchans = im.shape
+    with open(path, 'wb') as fid:
+        if nchans == 1:
+            fid.write(b'Pf\n')
+        elif nchans == 3:
+            fid.write(b'PF\n')
+        else:
+            raise ValueError("Unknown channel count {}".format(nchans))
 
-    # size
-    s = str(width).encode() + b' ' + str(height).encode() + b'\n'
-    fid.write(s)
+        # size
+        s = str(width).encode() + b' ' + str(height).encode() + b'\n'
+        fid.write(s)
 
-    # endian
-    fid.write(b'-1\n')
+        # endian
+        fid.write(b'-1\n')
 
-    im.tofile(fid)
+        im.tofile(fid)
