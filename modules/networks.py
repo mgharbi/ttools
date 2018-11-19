@@ -13,7 +13,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 
-class _ConvModule(nn.Module):
+class ConvModule(nn.Module):
   """Basic convolution module with conv + norm(optional) + activation(optional).
 
   Args:
@@ -27,7 +27,7 @@ class _ConvModule(nn.Module):
   """
   def __init__(self, n_in, n_out, ksize, stride=1, pad=True,
                activation="relu", norm_layer=None):
-    super(_ConvModule, self).__init__()
+    super(ConvModule, self).__init__()
 
     assert isinstance(n_in, int) and n_in > 0, "Input channels should be a positive integer got {}".format(n_in)
     assert isinstance(n_out, int) and n_out > 0, "Output channels should be a positive integer got {}".format(n_out)
@@ -54,7 +54,7 @@ class _ConvModule(nn.Module):
     return x
 
 
-class _FCModule(nn.Module):
+class FCModule(nn.Module):
   """Basic fully connected module with optional dropout.
 
   Args:
@@ -64,7 +64,7 @@ class _FCModule(nn.Module):
     dropout(float): dropout ratio if defined, default to None: no dropout.
   """
   def __init__(self, n_in, n_out, activation="relu", dropout=None):
-    super(_FCModule, self).__init__()
+    super(FCModule, self).__init__()
 
     assert isinstance(n_in, int) and n_in > 0, "Input channels should be a positive integer"
     assert isinstance(n_out, int) and n_out > 0, "Output channels should be a positive integer"
@@ -143,7 +143,7 @@ class ConvChain(nn.Module):
     for lvl in range(depth):
       self.add_module(
         "conv{}".format(lvl),
-        _ConvModule(_in[lvl], _out[lvl], _ksizes[lvl], stride=_strides[lvl], pad=pad,
+        ConvModule(_in[lvl], _out[lvl], _ksizes[lvl], stride=_strides[lvl], pad=pad,
                     activation=_activations[lvl], norm_layer=_norms[lvl]))
 
   def forward(self, x):
@@ -199,7 +199,7 @@ class FCChain(nn.Module):
     for lvl in range(depth):
       self.add_module(
         "fc{}".format(lvl),
-        _FCModule(_in[lvl], _out[lvl], activation=_activations[lvl],
+        FCModule(_in[lvl], _out[lvl], activation=_activations[lvl],
                   dropout=_dropout[lvl]))
 
   def forward(self, x):

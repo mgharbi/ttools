@@ -16,7 +16,7 @@ class TestConvModule(unittest.TestCase):
     self.in_ = th.ones(self.bs, self.c, self.h, self.w)
 
   def test_basic_conv(self):
-    cv = networks._ConvModule(self.c, self.c_out, 3)
+    cv = networks.ConvModule(self.c, self.c_out, 3)
     out_ = cv(self.in_)
 
     self.assertListEqual(list(out_.shape), [self.bs, self.c_out, self.h, self.w])
@@ -26,19 +26,19 @@ class TestConvModule(unittest.TestCase):
     self.assertIsNotNone(cv.conv.bias)
 
   def test_norm(self):
-    cv = networks._ConvModule(self.c, self.c_out, 3, norm_layer="instance")
+    cv = networks.ConvModule(self.c, self.c_out, 3, norm_layer="instance")
     self.assertIsNone(cv.conv.bias)
     self.assertIsNotNone(cv.norm)
 
   def test_no_pad(self):
     k = 3
-    cv = networks._ConvModule(self.c, self.c_out, k, pad=False)
+    cv = networks.ConvModule(self.c, self.c_out, k, pad=False)
     out_ = cv(self.in_)
     self.assertListEqual(list(out_.shape), [self.bs, self.c_out, self.h-k+1, self.w-k+1])
 
   def test_strided(self):
     k = 3
-    cv = networks._ConvModule(self.c, self.c_out, k, stride=2)
+    cv = networks.ConvModule(self.c, self.c_out, k, stride=2)
     out_ = cv(self.in_)
     self.assertListEqual(list(out_.shape), [self.bs, self.c_out, self.h/2, self.w/2])
 
@@ -154,7 +154,7 @@ class TestFCModule(unittest.TestCase):
     self._in = th.ones(self.bs, self.c)
 
   def test_basic_fc(self):
-    fc = networks._FCModule(self.c, self.c_out, dropout=0.5)
+    fc = networks.FCModule(self.c, self.c_out, dropout=0.5)
     out_ = fc(self._in)
     
     self.assertListEqual(list(out_.shape), [self.bs, self.c_out])
@@ -165,11 +165,11 @@ class TestFCModule(unittest.TestCase):
     self.assertIsNotNone(fc.fc.bias)
 
   def test_no_dropout(self):
-    fc = networks._FCModule(self.c, self.c_out)
+    fc = networks.FCModule(self.c, self.c_out)
     self.assertRaises(AttributeError, getattr, fc, "dropout")
 
   def test_no_activation(self):
-    fc = networks._FCModule(self.c, self.c_out, activation=None)
+    fc = networks.FCModule(self.c, self.c_out, activation=None)
     self.assertRaises(AttributeError, getattr, fc, "activation")
     self.assertRaises(AttributeError, getattr, fc, "dropout")
 
