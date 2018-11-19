@@ -1,5 +1,7 @@
 """Common used neural networks operations."""
 
+# TODO(mgharbi): maybe add a norm layer at the output if we specify an activation fn ?
+
 from collections import OrderedDict
 
 import numpy as np
@@ -86,7 +88,7 @@ class _FCModule(nn.Module):
 
 
 class ConvChain(nn.Module):
-  """Linear chain of convolution layers with no spatial downsampling.
+  """Linear chain of convolution layers.
 
   Args:
     n_in(int): number of input channels.
@@ -206,12 +208,123 @@ class FCChain(nn.Module):
     return x
 
 
-class Autoencoder(nn.Module):
+class DownConvChain(ConvChain):
+  """Chain of convolution layers with 2x spatial downsamplings.
+
+  Args:
+    n_in(int): number of input channels.
+    n_out(int): number of output channels.
+    ksize(int): size of the convolution kernel (square).
+    base_width(int): number of features channels in the intermediate layers.
+    increase_factor(float): multiplicative factor on feature size after downsampling.
+    num_levels(int): number of downsampling levels.
+    convs_per_level(int or list of ints): number of conv layers at each levels.
+    pad(bool): if True, zero pad the convolutions to maintain a constant size.
+    activation(str): nonlinear activation function between convolutions.
+    norm_layer(str): normalization to apply between the convolution modules.
+    out_activation(str): activation function applied to the output, defaults to linear (none).
+  """
+  def __init__(self, n_in, n_out, ksize=3, base_width=64, increase_factor=2.0, 
+               num_levels=3, convs_per_level=2, pad=True,
+               activation="relu", norm_layer=None, out_activation=None):
+
+    assert isinstance(num_levels, int) and num_levels > 0, "num_levels should be a positive integer"
+    assert isinstance(convs_per_level, int) or isinstance(convs_per_level, list), "convs_per_level should be a positive integer or list of ints"
+    assert isinstance(increase_factor, float) and increase_factor >= 1.0, "increase_factor should be a float >= 1.0"
+
+    if (increase_factor, int):
+      increase_factor = [increase_factor]*num_levels
+    assert len(increase_factor) == num_levels, "increase_factor should have num_levels entries"
+
+    depth = num_levels*convs_per_level + 1
+    widths = []
+    strides = []
+    w = base_width
+    for lvl in range(num_levels):
+      for cv in range(convs_per_level):
+        if cv==convs_per_level-1:
+          strides.append(2)
+        else:
+          strides.append(1)
+        widths.append(w)
+      w = int(w*increase_factor[lvl])
+    strides.append(1)
+
+    super(DownConvChain, self).__init__(
+      n_in, n_out, ksize=ksize, depth=depth, strides=strides, pad=pad,
+      activation=activation, norm_layer=norm_layer,
+      out_activation=out_activation)
+
+# class ConvAutoencoder(nn.Module):
+#   """Convolutionnal autoencoder with a spatially downsampled bottleneck.
+#
+#   Args:
+#     n_in(int): number of input channels.
+#     n_out(int): number of output channels.
+#     ksize(int or list of int): size of the convolution kernel (square).
+#     width(int or list of int): number of features channels in the intermediate layers.
+#     depth(int): number of downsampling layers
+#     strides(list of int): stride between kernels. If None, defaults to 1 for all.
+#     pad(bool): if True, zero pad the convolutions to maintain a constant size.
+#     activation(str): nonlinear activation function between convolutions.
+#     norm_layer(str): normalization to apply between the convolution modules.
+#     out_activation(str): activation function applied to the output, defaults to linear (none).
+#   """
+#   def __init__(self, n_in, n_out, ksize=3, width=64, depth=3, strides=None, pad=True,
+#                activation="relu", norm_layer=None, out_activation=None):
+#     super(ConvAutoencoder, self).__init__()
+#
+#     self.encoder = DownConvChain(n_in, n_bottleneck, ksize=ksize, width=e_widths,
+#                              strides=e_strides, depth=e_depth, pad=pad,
+#                              activation=activation, norm_layer=norm_layer,
+#                              out_activation=activation)
+#
+#     self.decoder = UpConvChain()
+#
+#   def __init__(self, n_in, n_out, ksize=3, width=64, depth=3, strides=None, pad=True,
+#                activation="relu", norm_layer=None, out_activation=None):
+
+  def encode(self, x):
+    return self.encoder(x)
+
+  def decode(self, z):
+    return self.decode(z)
+
+  def forward(self, x):
+      return self.decode(self.encode(x))
+
+
+class UpConvChain(nn.Module):
   pass
 
 
 class UNet(nn.Module):
-  pass
+  """
+  """
+  def __init__(self):
+    pass
+
+  class _UNetLevel(nn.Module):
+    """
+    """
+    def __init__(self):
+      pass
+
+    def _encode(self):
+      pass
+
+    def _upsample(self):
+      pass
+
+    def forward(self, x):
+      encoded = self.encode(x)
+      if self.has_child():
+        ds = self.downsample(encoded)
+        lowres_features = self.child(ds)
+        us = self.upsample(lowres_features)
+        encoded = self.skip_connect(us, encoded)
+      return self.decode(encoded)
+
 
 def _get_norm_layer(norm_layer, channels):
   valid = ["instance", "batch"]
@@ -240,5 +353,3 @@ def _init_fc_or_conv(fc_conv, activation):
   nn.init.xavier_uniform_(fc_conv.weight, gain)
   if fc_conv.bias is not None:
     nn.init.constant_(fc_conv.bias, 0.0)
-
-
