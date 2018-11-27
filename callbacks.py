@@ -7,11 +7,13 @@ import time
 from tqdm import tqdm
 import visdom
 
+from .utils import ExponentialMovingAverage
 
 LOG = logging.getLogger(__name__)
 
 __all__ = ["Callback"]
 
+# TODO(mgharbi): smooth average in viz
 
 class Callback(object):
     """Base class for all training callbacks."""
@@ -68,7 +70,7 @@ class KeyedCallback(Callback):
       val_keys (list of str): list of keys whose values will be logged during validation
     """
 
-    def __init__(self, keys=None, val_keys=None):
+    def __init__(self, keys=None, val_keys=None, smoothing=0.99):
         super(KeyedCallback, self).__init__()
         if keys is None:
             self.keys = ["loss"]
@@ -79,6 +81,9 @@ class KeyedCallback(Callback):
             self.val_keys = self.keys
         else:
             self.val_keys = val_keys
+
+        self.ema = ExponentialMovingAverage(keys, alpha=smoothing)
+
 
 
 class VisdomLoggingCallback(KeyedCallback):
@@ -92,7 +97,8 @@ class VisdomLoggingCallback(KeyedCallback):
       env (string): name of the Visdom environment to log to.
     """
 
-    def __init__(self, keys=None, val_keys=None, frequency=100, port=8097, env="main"):
+    def __init__(self, keys=None, val_keys=None, frequency=100, port=8097, env="main",
+                 log=False):
         super(VisdomLoggingCallback, self).__init__(
             keys=keys, val_keys=val_keys)
         self._api = visdom.Visdom(port=port, env=env)
@@ -105,6 +111,8 @@ class VisdomLoggingCallback(KeyedCallback):
                 self._api.close(k)
             self._opts[k] = {
                 "legend": ["train", "val"], "title": k, "xlabel": "epoch", "ylabel": k}
+            if log:
+                self._opts[k]["ytype"] = "log"
 
         self._step = 0
         self.frequency = frequency
@@ -120,7 +128,8 @@ class VisdomLoggingCallback(KeyedCallback):
         t = self.batch / self.datasize + self.epoch
 
         for k in self.keys:
-            self._api.line([bwd[k]], [t], update="append", win=k, name="train",
+            self.ema.update(k, bwd[k])
+            self._api.line([self.ema[k]], [t], update="append", win=k, name="train",
                            opts=self._opts[k])
 
         self._step += 1
@@ -248,8 +257,11 @@ class ProgressBarCallback(KeyedCallback):
 
     def batch_end(self, batch_data, fwd, bwd_data):
         super(ProgressBarCallback, self).batch_end(batch_data, fwd, bwd_data)
+        d = {}
+        for k in self.keys:
+            self.ema.update(k, bwd_data[k])
+            d[k] = self.ema[k]
         self.pbar.update(1)
-        d = {k: bwd_data[k] for k in self.keys}
         self.pbar.set_postfix(d)
 
     TABSTOPS = 2

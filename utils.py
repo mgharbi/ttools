@@ -45,21 +45,21 @@ class Averager(object):
         self.counts[key] += count
 
 
-class Timer(object):
-    """A simple named timer context.
-
-    Usage:
-      with Timer("header_name"):
-        do_sth()
-    """
-
-    def __init__(self, header=""):
-        self.header = header
-        self.time = 0
-
-    def __enter__(self):
-        self.time = time.time()
-
-    def __exit__(self, tpye, value, traceback):
-        elapsed = (time.time()-self.time)*1000
-        print("{}, {:.1f}ms".format(self.header, elapsed))
+# class Timer(object):
+#     """A simple named timer context.
+#
+#     Usage:
+#       with Timer("header_name"):
+#         do_sth()
+#     """
+#
+#     def __init__(self, header=""):
+#         self.header = header
+#         self.time = 0
+#
+#     def __enter__(self):
+#         self.time = time.time()
+#
+#     def __exit__(self, tpye, value, traceback):
+#         elapsed = (time.time()-self.time)*1000
+#         print("{}, {:.1f}ms".format(self.header, elapsed))
