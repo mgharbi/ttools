@@ -84,6 +84,9 @@ class KeyedCallback(Callback):
 
         self.ema = ExponentialMovingAverage(keys, alpha=smoothing)
 
+    def batch_end(self, batch_data, fwd, bwd):
+        for k in self.keys:
+            self.ema.update(k, bwd[k])
 
 
 class VisdomLoggingCallback(KeyedCallback):
@@ -97,10 +100,10 @@ class VisdomLoggingCallback(KeyedCallback):
       env (string): name of the Visdom environment to log to.
     """
 
-    def __init__(self, keys=None, val_keys=None, frequency=100, port=8097, env="main",
-                 log=False):
+    def __init__(self, keys=None, val_keys=None, frequency=100, port=8097,
+                 env="main", log=False, smoothing=0.99):
         super(VisdomLoggingCallback, self).__init__(
-            keys=keys, val_keys=val_keys)
+            keys=keys, val_keys=val_keys, smoothing=smoothing)
         self._api = visdom.Visdom(port=port, env=env)
 
         self._opts = {}
@@ -128,7 +131,6 @@ class VisdomLoggingCallback(KeyedCallback):
         t = self.batch / self.datasize + self.epoch
 
         for k in self.keys:
-            self.ema.update(k, bwd[k])
             self._api.line([self.ema[k]], [t], update="append", win=k, name="train",
                            opts=self._opts[k])
 
@@ -221,8 +223,8 @@ class LoggingCallback(KeyedCallback):
 class ProgressBarCallback(KeyedCallback):
     """A progress bar optimization logger."""
 
-    def __init__(self, keys=None, val_keys=None):
-        super(ProgressBarCallback, self).__init__(keys=keys, val_keys=val_keys)
+    def __init__(self, keys=None, val_keys=None, smoothing=0.99):
+        super(ProgressBarCallback, self).__init__(keys=keys, val_keys=val_keys, smoothing=smoothing)
         self.pbar = None
 
     def training_start(self, dataloader):
@@ -259,7 +261,6 @@ class ProgressBarCallback(KeyedCallback):
         super(ProgressBarCallback, self).batch_end(batch_data, fwd, bwd_data)
         d = {}
         for k in self.keys:
-            self.ema.update(k, bwd_data[k])
             d[k] = self.ema[k]
         self.pbar.update(1)
         self.pbar.set_postfix(d)
