@@ -39,7 +39,7 @@ class KernelWeighting(th.autograd.Function):
 
   @staticmethod
   def backward(ctx, d_output, d_sum_w):
-    data, weights, sum_w = ctx.saved_variables
+    data, weights, sum_w = ctx.saved_tensors
     d_data = data.new()
     d_weights = weights.new()
 
