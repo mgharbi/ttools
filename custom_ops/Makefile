@@ -71,7 +71,7 @@ endif
 # Assemble all the custom operators in a single shared library to be loaded by Python
 _ext/operators/_operators.so: $(CUDA_OPS_LIBS) $(CUDA_OBJ) $(OPS_LIBS) 
 	@echo Python CFFI wrapper
-	@$(PYTHON) setup.py build
+	@$(PYTHON) setup.py install
 
 # Rule for pure cuda kernels
 # $(BUILD_DIR)/%_cuda.so: $(SRC_DIR)/cuda_kernels/%.cu.cc $(SRC_DIR)/cuda_kernels/%.h $(BUILD_DIR)

@@ -82,7 +82,7 @@ class KeyedCallback(Callback):
         else:
             self.val_keys = val_keys
 
-        self.ema = ExponentialMovingAverage(keys, alpha=smoothing)
+        self.ema = ExponentialMovingAverage(self.keys, alpha=smoothing)
 
     def batch_end(self, batch_data, fwd, bwd):
         for k in self.keys:

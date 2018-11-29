@@ -45,6 +45,20 @@ class Averager(object):
         self.counts[key] += count
 
 
+def parse_params(plist):
+    params = {}
+    if plist is not None:
+        for p in plist:
+            k, v = p.split("=")
+            if v.isdigit():
+                v = int(v)
+            elif v == "False":
+                v = False
+            elif v == "True":
+                v = True
+            params[k] = v
+    return params
+
 # class Timer(object):
 #     """A simple named timer context.
 #

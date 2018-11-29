@@ -3,3 +3,9 @@ test:
 
 coverage:
 	py.test --cov=. tests
+
+custom_ops:
+	$(MAKE) -C $@
+
+.PHONY: custom_ops
+

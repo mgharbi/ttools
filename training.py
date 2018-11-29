@@ -30,6 +30,8 @@ class BasicArgumentParser(argparse.ArgumentParser):
         self.add_argument("--bs", type=int, default=4, help="Batch size")
         self.add_argument("--num_epochs", type=int,
                           help="Number of epochs to train for")
+        self.add_argument("--num_worker_threads", default=4, type=int,
+                          help="Number of threads that load data")
 
         self.add_argument("--experiment_log",
                           help="csv file in which we log our experiments")
@@ -42,8 +44,9 @@ class BasicArgumentParser(argparse.ArgumentParser):
         self.add_argument("--env", default="main", help="Visdom environment")
         self.add_argument("--port", default=8097, type=int,
                           help="Visdom server port")
+        self.add_argument('--debug', dest="debug", action="store_true")
 
-        self.set_defaults(cuda=th.cuda.is_available())
+        self.set_defaults(cuda=th.cuda.is_available(), debug=False)
 
 
 def set_logger(debug=False):
