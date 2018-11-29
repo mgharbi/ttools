@@ -1,11 +1,27 @@
-# class CropLike(nn.Module):
-#   def __init__(self):
-#     pass
-#
-#   def forward(self, to_crop, like):
-#     pass
-#
-#
+import numpy as np
+import torch as th
+
+def crop_like(src, tgt):
+    """Crop a source image to match the spatial dimensions of a target.
+
+    Assumes sizes are even.
+
+    src (th.Tensor or np.ndarray): image to be cropped
+    tgt (th.Tensor or np.ndarray): reference image
+    """
+    src_sz = np.array(src.shape)
+    tgt_sz = np.array(tgt.shape)
+
+    # Assumes the spatial dimensions are the last two
+    crop = (src_sz[-2:]-tgt_sz[-2:])
+    assert (np.mod(crop, 2) == 0).all(), "crop like sizes should be even"
+    crop //= 2
+    if (crop > 0).any():
+        return src[..., crop[0]:src_sz[2]-crop[0], crop[1]:src_sz[3]-crop[1]]
+    else:
+        return src
+
+
 # class MedianFilter(nn.Module):
 #   def __init__(self, ksize=3):
 #     super(MedianFilter, self).__init__()
