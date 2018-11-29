@@ -1,0 +1,3 @@
+[submodule "custom_ops/gradient-halide"]
+	path = custom_ops/gradient-halide
+	url = https://github.com/jrk/gradient-halide.git
