@@ -35,8 +35,9 @@ def test_kernel_weighting(gpu=th.cuda.is_available()):
       loss.backward()
   print(prof)
 
+
 def test_kernel_weighting_odd_size(gpu=th.cuda.is_available()):
-  bs = 4
+  bs = 8
   c = 3
   h = 122
   w = 122
@@ -138,4 +139,3 @@ def test_scatter2gather_grad(gpu=th.cuda.is_available()):
       (weights, ),
       eps=1e-4, atol=5e-2, rtol=5e-4,
        )
-

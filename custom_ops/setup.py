@@ -19,7 +19,7 @@ def generate_pybind_wrapper(path, headers):
   s += "}\n"
   with open(path, 'w') as fid:
     fid.write(s)
-  print(s)
+
 
 abs_path = os.path.dirname(os.path.realpath(__file__))
 build_dir = os.path.join(abs_path, "build")
@@ -31,10 +31,9 @@ if not os.path.exists(halide_dir):
   raise ValueError("Halide directory {} is invalid".format(halide_dir))
 
 include_dirs = [os.path.join(abs_path, "build"), os.path.join(halide_dir, "include")]
+compile_args = ["-std=c++11"]
 if platform.system() == "Darwin":
-  compile_args = ["-std=c++11", "-stdlib=libc++"]  # on osx libstdc++ causes trouble
-else:
-  compile_args = ["-std=c++11"]
+  compile_args += ["-stdlib=libc++"]  # on osx libstdc++ causes trouble
 
 re_cc = re.compile(r".*\.pytorch\.h")
 hl_srcs = [f for f in os.listdir(build_dir) if re_cc.match(f)]

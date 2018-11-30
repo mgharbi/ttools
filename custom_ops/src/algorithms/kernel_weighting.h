@@ -88,21 +88,20 @@ std::map<std::string, Func> kernel_weighting_backward(
                        kw - 1 - r_kernel.x,
                        kh - 1 - r_kernel.y, n);
 
-    Func d_data_tmp("d_data_tmp");
     // out = sum { data * w }
     // dL / ddata = sum {dL/dout * dout / ddata } (= sum {dL/dout * w})
     //              + sum {dL/dsumw * dsumw / ddata} (=0)
+    Func d_data_tmp("d_data_tmp");
     d_data_tmp(x, y, c, n) = 0.0f;
-    d_data_tmp(x, y, c, n) += w * f_d_output(x + r_kernel.x - (kw-1)/2,
-                                         y + r_kernel.y - (kh-1)/2,
-                                         c, n);
+    d_data_tmp(x, y, c, n) += w * f_d_output(
+            x + r_kernel.x - (kw-1)/2, y + r_kernel.y - (kh-1)/2, c, n);
     d_data(x, y, c, n) = d_data_tmp(x, y, c, n);
 
-    Func d_weights_tmp("d_weights_tmp");
     // sumw = sum { w }
     // dL / dwj = sum { dL/dout * dout / dwj } (=sum{dL/dout * dataj})
     //          + sum { dL/dsumw * dsumw / dwj } (=sum{dL/dsumw * wj})
     // Expr w2 = f_weights(x, y, dx, dy, n);
+    Func d_weights_tmp("d_weights_tmp");
     RDom rchan(0, data.dim(2).extent());
     d_weights_tmp(x, y, dx, dy, n) = d_sum_w(x, y, n);
     d_weights_tmp(x, y, dx, dy, n) += 
@@ -111,8 +110,8 @@ std::map<std::string, Func> kernel_weighting_backward(
     d_weights(x, y, dx, dy, n) = d_weights_tmp(x, y, dx, dy, n);
     
     std::map<std::string, Func> func_map;
-    func_map["d_data_tmp"] = d_data_tmp;
-    func_map["d_weights_tmp"] = d_weights_tmp;
+    // func_map["d_data_tmp"] = d_data_tmp;
+    // func_map["d_weights_tmp"] = d_weights_tmp;
 
     return func_map;
 }

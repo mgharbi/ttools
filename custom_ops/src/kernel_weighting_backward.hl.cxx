@@ -25,18 +25,10 @@ public:
 
         if(get_target().has_gpu_feature()) {
             d_data
-                .fuse(x, y, xy)
-                .fuse(c, n, cn)
-                .fuse(xy, cn, allvars)
-                .gpu_tile(allvars, tx, 1024)
+                .gpu_tile(x, y, tx, ty, 32, 32)
                 ;
-
             d_weights
-                .fuse(x, y, xy)
-                .fuse(dx, dy, dxdy)
-                .fuse(xy, dxdy, allvars)
-                .fuse(allvars, n, allvars)
-                .gpu_tile(allvars, tx, 1024)
+                .gpu_tile(x, y, tx, ty, 32, 32)
                 ;
         } else {
             d_data
@@ -48,15 +40,16 @@ public:
                 ;
 
             d_weights
+                .compute_root()
                 .fuse(dx, dy, dxdy)
                 .fuse(y, dxdy, allvars)
                 .fuse(allvars, n, allvars)
-                .compute_root()
                 .parallel(allvars, 8)
                 .vectorize(x, 8)
                 ;
         }
         // d_data.print_loop_nest();
+
     }
 };
 

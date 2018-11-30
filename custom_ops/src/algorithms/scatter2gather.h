@@ -15,14 +15,15 @@ Var x("x"), y("y"),
 template <typename InputBuffer, typename OutputBuffer>
 std::map<std::string, Func> scatter2gather(
         const InputBuffer &weights,
-        const OutputBuffer &output)
+        const OutputBuffer &output, Expr kw, Expr kh)
 {
     Func f_weights("f_weights");
-    f_weights(x, y, dx, dy, n) = Halide::BoundaryConditions::constant_exterior(
-        weights, 0.0f)(x, y, dx, dy, n);
+    f_weights(x, y, dx, dy, n) = weights(x, y, dx, dy, n);
+    // f_weights(x, y, dx, dy, n) = Halide::BoundaryConditions::constant_exterior(
+    //     weights, 0.0f)(x, y, dx, dy, n);
 
-    Expr kw = weights.dim(2).extent();
-    Expr kh = weights.dim(3).extent();
+    // Expr kw = weights.dim(2).extent();
+    // Expr kh = weights.dim(3).extent();
 
     Expr ddx = dx - (kw-1)/2;
     Expr ddy = dy - (kh-1)/2;

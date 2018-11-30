@@ -1,5 +1,4 @@
 PYTHON=python3
-# TORCH_INC ?= `$(PYTHON) -c 'import torch.utils.ffi as ffi; print("-I"+" -I".join(ffi._setup_wrapper(True)[1]))'`
 
 # Halide utilities
 HALIDE_DIR = gradient-halide
@@ -52,8 +51,8 @@ EXT_DIR = dist
 
 # The makefile assumes that each op that has a backward also has a forward
 OPS = scatter2gather_forward \
-	  kernel_weighting_forward \
-	  kernel_weighting_backward
+			kernel_weighting_forward \
+			kernel_weighting_backward
 
 OPS_LIBS = $(addsuffix .a, $(addprefix $(BUILD_DIR)/, $(OPS)))
 
@@ -69,13 +68,15 @@ CUDA_OPS_LIBS = $(addsuffix _cuda.a, $(addprefix $(BUILD_DIR)/, $(OPS)))
 endif
 
 # Assemble all the custom operators in a single shared library to be loaded by Python
-_ext/operators/_operators.so: $(CUDA_OPS_LIBS) $(CUDA_OBJ) $(OPS_LIBS) 
-	@echo Python CFFI wrapper
+_ext/operators/_operators.so: $(CUDA_OPS_LIBS) $(CUDA_OBJ) $(OPS_LIBS)
+	@echo Installing python module
 	@$(PYTHON) setup.py install
 
 # Rule for pure cuda kernels
 # $(BUILD_DIR)/%_cuda.so: $(SRC_DIR)/cuda_kernels/%.cu.cc $(SRC_DIR)/cuda_kernels/%.h $(BUILD_DIR)
 # 		$(NVCC) -c  $< -o $@ $(NVFLAGS) $(TORCH_INC)
+#
+# TODO(mgharbi): auto generate float/double variants
 
 $(BUILD_DIR)/%.a: $(BUILD_DIR)/%
 	@echo Building Op $(subst $(BUILD_DIR)/,, $@)
@@ -83,7 +84,7 @@ $(BUILD_DIR)/%.a: $(BUILD_DIR)/%
 	DYLD_LIBRARY_PATH=$(HALIDE_DIR)/bin LD_LIBRARY_PATH=$(HALIDE_DIR)/bin FLUSH_MEMOIZE_CACHE=0 \
 										./$(basename $(@F)) -g $(basename $(@F)) \
 										-e static_library,h,pytorch_wrapper\
-										-o . target=host$(TARGET_FEATURES) \
+										-o . target=host$(TARGET_FEATURES)\
 										auto_schedule=$(AUTO_SCHEDULE)
 
 $(BUILD_DIR)/%_cuda.a: $(BUILD_DIR)/%
@@ -92,7 +93,7 @@ $(BUILD_DIR)/%_cuda.a: $(BUILD_DIR)/%
 	@cd $(BUILD_DIR); \
 	DYLD_LIBRARY_PATH=$(HALIDE_DIR)/bin LD_LIBRARY_PATH=$(HALIDE_DIR)/bin FLUSH_MEMOIZE_CACHE=0 \
 										./$(name) -g $(name) -f $(name)_cuda \
-										-e static_library,h\
+										-e static_library,h,pytorch_wrapper\
 										-o . target=host-cuda-cuda_capability_61-user_context$(TARGET_FEATURES) \
 										auto_schedule=$(AUTO_SCHEDULE)
 
