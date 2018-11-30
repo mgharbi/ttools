@@ -25,10 +25,11 @@ public:
         if(get_target().has_gpu_feature()) {
             output
                 .compute_root()
+                // .gpu_tile(x, y, tx, tx, 32, 32)
                 .fuse(x, y, xy)
                 .fuse(dx, dy, dxdy)
                 .fuse(xy, dxdy, allvars)
-                .fuse(allvars, n, allvars)
+                // .fuse(allvars, n, allvars)
                 .gpu_tile(allvars, tx, 1024)
                 ;
         } else {
