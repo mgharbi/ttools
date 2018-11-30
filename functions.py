@@ -18,11 +18,10 @@ class Scatter2Gather(th.autograd.Function):
     output = data.new()
     output.resize_as_(data)
     assert len(data.shape) == 5, "data should be 5d"
-    _, kh, kw, _, _ = data.shape
     if _is_cuda(data):
-      ops.scatter2gather_forward_cuda(data, kw, kh, output)
+      ops.scatter2gather_forward_cuda(data, output)
     else:
-      ops.scatter2gather_forward(data, kw, kh, output)
+      ops.scatter2gather_forward(data, output)
     return output
 
   @staticmethod
@@ -30,7 +29,7 @@ class Scatter2Gather(th.autograd.Function):
     d_data = d_output.new()
     d_data.resize_as_(d_output)
     _, kh, kw, _, _ = d_data.shape
-    ops.scatter2gather_forward(d_output, kw, kh, d_data)
+    ops.scatter2gather_forward(d_output, d_data)
     return d_data
 
 

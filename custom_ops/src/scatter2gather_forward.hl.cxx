@@ -9,14 +9,12 @@ namespace rendernet {
  */
 class Scatter2GatherForwardGenerator : public Generator<Scatter2GatherForwardGenerator> {
 public:
-    Input<Func> weights{"weights", Float(32), 5};
-    Output<Func> output{"output", Float(32), 5};
-    Input<int> kw{"kw"};
-    Input<int> kh{"kh"};
+    Input<Buffer<float>> weights{"weights", 5};
+    Output<Buffer<float>> output{"output", 5};
 
     void generate() {
         std::map<std::string, Func> funcs = scatter2gather(
-            weights, output, kw, kh);
+            weights, output);
 
         Var tx("tx"), ty("ty"), tz("tz"), dxdy("dxdy"),
             xy("xy"), cn("cn"), allvars("allvars");
@@ -29,7 +27,7 @@ public:
                 .fuse(x, y, xy)
                 .fuse(dx, dy, dxdy)
                 .fuse(xy, dxdy, allvars)
-                // .fuse(allvars, n, allvars)
+                .fuse(allvars, n, allvars)
                 .gpu_tile(allvars, tx, 1024)
                 ;
         } else {
