@@ -9,8 +9,8 @@ namespace rendernet {
  */
 class Scatter2GatherForwardGenerator : public Generator<Scatter2GatherForwardGenerator> {
 public:
-    Input<Buffer<float>> weights{"weights", 5};
-    Output<Buffer<float>> output{"output", 5};
+    Input<Buffer<float> weights{"weights", 5};
+    Output<Buffer<float> output{"output", 5};
 
     void generate() {
         std::map<std::string, Func> funcs = scatter2gather(
