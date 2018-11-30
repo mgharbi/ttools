@@ -29,7 +29,10 @@ class Scatter2Gather(th.autograd.Function):
     d_data = d_output.new()
     d_data.resize_as_(d_output)
     _, kh, kw, _, _ = d_data.shape
-    ops.scatter2gather_forward(d_output, d_data)
+    if _is_cuda(d_output):
+      ops.scatter2gather_forward_cuda(d_output, d_data)
+    else:
+      ops.scatter2gather_forward(d_output, d_data)
     return d_data
 
 
