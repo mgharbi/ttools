@@ -2,6 +2,8 @@
 
 import abc
 import logging
+import random
+import string
 import time
 
 from tqdm import tqdm
@@ -359,11 +361,15 @@ class ImageDisplayCallback(Callback, abc.ABC):
       env (string): name of the Visdom environment to log to.
     """
 
-    def __init__(self, frequency=100, port=8097, env="main"):
+    def __init__(self, frequency=100, port=8097, env="main", win=None):
         super(ImageDisplayCallback, self).__init__()
         self.freq = frequency
         self._api = visdom.Visdom(port=port, env=env)
         self._step = 0
+        if win is None:
+            self.win = _random_string()
+        else:
+            self.win = win
 
     @abc.abstractmethod
     def visualized_image(self, batch, fwd_result, bwd_result):
@@ -383,7 +389,7 @@ class ImageDisplayCallback(Callback, abc.ABC):
         opts = {"caption": "Epoch {}, batch {}: {}".format(self.epoch, self.batch, caption)}
 
         viz = self.visualized_image(batch, fwd_result, bwd_result)
-        self._api.images(viz, win="images", opts=opts)
+        self._api.images(viz, win=self.win, opts=opts)
         self._step += 1
 
 
@@ -409,3 +415,6 @@ class CSVLoggingCallback(Callback):
     pass
 
 
+def _random_string(size=16):
+    return ''.join([random.choice(string.ascii_letters) for i in range(size)])
+    
