@@ -369,6 +369,9 @@ class ImageDisplayCallback(Callback, abc.ABC):
     def visualized_image(self, batch, fwd_result, bwd_result):
         pass
 
+    def caption(self, batch, fwd_result, bwd_result):
+        return ""
+
     def batch_end(self, batch, fwd_result, bwd_result):
         if self._step % self.freq != 0:
             self._step += 1
@@ -376,7 +379,8 @@ class ImageDisplayCallback(Callback, abc.ABC):
 
         self._step = 0
 
-        opts = {"caption": "Epoch {}, batch {}".format(self.epoch, self.batch)}
+        caption = self.caption(batch, fwd_result, bwd_result)
+        opts = {"caption": "Epoch {}, batch {}: {}".format(self.epoch, self.batch, caption)}
 
         viz = self.visualized_image(batch, fwd_result, bwd_result)
         self._api.images(viz, win="images", opts=opts)
