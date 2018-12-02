@@ -51,11 +51,10 @@ class FCChain(nn.Module):
       depth(int): number of layers
       activation(str): nonlinear activation function between convolutions.
       dropout(float or list of float): dropout ratio if defined, default to None: no dropout.
-      out_activation(str): activation function applied to the output, defaults to linear (none).
     """
 
     def __init__(self, n_in, n_out, width=64, depth=3, activation="relu",
-                 dropout=None, out_activation=None):
+                 dropout=None):
         super(FCChain, self).__init__()
 
         assert isinstance(
@@ -79,20 +78,17 @@ class FCChain(nn.Module):
             _in = _in + width
             _out = width + _out
 
-        _activations = [activation]*(depth-1) + [out_activation]
+        _activations = [activation]*depth
 
         if dropout is not None:
             assert isinstance(dropout, float) or isinstance(
                 dropout, list), "Dropout should be a float or a list of floats"
 
         if dropout is None or isinstance(dropout, float):
-            # dont do dropout on in/out layers
-            _dropout = [None] + [dropout]*(depth-2) + [None]
+            _dropout = [dropout]*depth
         elif isinstance(dropout, list):
-            assert depth > 2 and len(
-                dropout) == depth-2, "Needs at least three layers to specify dropout with a list (do not specify in/out)."
-            # dont do dropout on in/out layers
-            _dropout = [None] + dropout + [None]
+            assert len(dropout) == depth, "When specifying a list of dropout, the list should have 'depth' elements."
+            _dropout = dropout
 
         # Core processing layers, no norm at the first layer
         for lvl in range(depth):
@@ -165,11 +161,10 @@ class ConvChain(nn.Module):
       pad(bool): if True, zero pad the convolutions to maintain a constant size.
       activation(str): nonlinear activation function between convolutions.
       norm_layer(str): normalization to apply between the convolution modules.
-      out_activation(str): activation function applied to the output, defaults to linear (none).
     """
 
     def __init__(self, n_in, n_out, ksize=3, width=64, depth=3, strides=None, pad=True,
-                 activation="relu", norm_layer=None, out_activation=None):
+                 activation="relu", norm_layer=None):
         super(ConvChain, self).__init__()
 
         assert isinstance(
@@ -209,9 +204,9 @@ class ConvChain(nn.Module):
                 ksize) == depth, "kernel size list should have 'depth' entries"
             _ksizes = ksize
 
-        _activations = [activation]*(depth-1) + [out_activation]
+        _activations = [activation]*depth
         # dont normalize in/out layers
-        _norms = [None] + [norm_layer]*(depth-2) + [None]
+        _norms = [norm_layer]*depth
 
         # Core processing layers, no norm at the first layer
         for lvl in range(depth):
@@ -240,12 +235,11 @@ class DownConvChain(ConvChain):
       pad(bool): if True, zero pad the convolutions to maintain a constant size.
       activation(str): nonlinear activation function between convolutions.
       norm_layer(str): normalization to apply between the convolution modules.
-      out_activation(str): activation function applied to the output, defaults to linear (none).
     """
 
     def __init__(self, n_in, n_out, ksize=3, base_width=64, increase_factor=2.0,
                  num_levels=3, convs_per_level=2, pad=True,
-                 activation="relu", norm_layer=None, out_activation=None):
+                 activation="relu", norm_layer=None):
 
         assert isinstance(
             num_levels, int) and num_levels > 0, "num_levels should be a positive integer"
@@ -275,8 +269,7 @@ class DownConvChain(ConvChain):
 
         super(DownConvChain, self).__init__(
             n_in, n_out, ksize=ksize, depth=depth, strides=strides, pad=pad,
-            activation=activation, norm_layer=norm_layer,
-            out_activation=out_activation)
+            activation=activation, norm_layer=norm_layer)
 
 # class ConvAutoencoder(nn.Module):
 #   """Convolutionnal autoencoder with a spatially downsampled bottleneck.

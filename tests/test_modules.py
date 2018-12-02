@@ -74,17 +74,17 @@ class TestConvChain(unittest.TestCase):
         self.assertEqual(len(list(cv.conv1.children())), 2)
         self.assertEqual(len(list(cv.conv2.children())), 2)
         self.assertEqual(len(list(cv.conv3.children())), 2)
-        self.assertEqual(len(list(cv.conv4.children())), 1)
+        self.assertEqual(len(list(cv.conv4.children())), 2)
 
         out_ = cv(self.in_data)
-        self.assertListEqual(list(out_.shape), [
-                             self.bs, self.c_out, self.h, self.w])
+        self.assertListEqual(
+            list(out_.shape), [self.bs, self.c_out, self.h, self.w])
 
     def test_output_activation(self):
         w = 32
         k = 3
         cv = networks.ConvChain(
-            self.c, self.c_out, depth=5, width=w, ksize=k, out_activation="relu")
+            self.c, self.c_out, depth=5, width=w, ksize=k)
         self.assertEqual(len(list(cv.conv4.children())), 2)
 
     def test_normalization(self):
@@ -92,16 +92,15 @@ class TestConvChain(unittest.TestCase):
         k = 3
         cv = networks.ConvChain(
             self.c, self.c_out, depth=4, width=w, ksize=k, norm_layer="batch")
-        self.assertEqual(len(list(cv.conv0.children())), 2)  # no norm
+        self.assertEqual(len(list(cv.conv0.children())), 3)
         self.assertEqual(len(list(cv.conv1.children())), 3)
         self.assertEqual(len(list(cv.conv2.children())), 3)
-        self.assertEqual(len(list(cv.conv3.children())),
-                         1)  # no norm, no activation
+        self.assertEqual(len(list(cv.conv3.children())), 3)
 
-        self.assertRaises(AttributeError, getattr, cv.conv0, "norm")
+        self.assertIsNotNone(cv.conv0.norm)
         self.assertIsNotNone(cv.conv1.norm)
         self.assertIsNotNone(cv.conv2.norm)
-        self.assertRaises(AttributeError, getattr, cv.conv3, "norm")
+        self.assertIsNotNone(cv.conv3.norm)
 
     def test_even_padding(self):
         w = 32
@@ -218,33 +217,33 @@ class TestFCChain(unittest.TestCase):
         self.assertEqual(len(list(fc.fc1.children())), 2)
         self.assertEqual(len(list(fc.fc2.children())), 2)
         self.assertEqual(len(list(fc.fc3.children())), 2)
-        self.assertEqual(len(list(fc.fc4.children())), 1)  # no activation
+        self.assertEqual(len(list(fc.fc4.children())), 2)
 
         out_ = fc(self.in_data)
         self.assertListEqual(list(out_.shape), [self.bs, self.c_out])
 
     def test_output_activation(self):
         w = 32
-        fc = networks.FCChain(self.c, self.c_out, depth=5,
-                              width=w, out_activation="relu")
+        fc = networks.FCChain(self.c, self.c_out, depth=5, width=w)
         self.assertEqual(len(list(fc.fc4.children())), 2)
 
     def test_dropout(self):
         w = 32
         fc = networks.FCChain(self.c, self.c_out,
                               depth=5, width=w, dropout=0.2)
-        self.assertEqual(len(list(fc.fc0.children())), 2)  # no norm
+        self.assertEqual(len(list(fc.fc0.children())), 3)
         self.assertEqual(len(list(fc.fc1.children())), 3)
         self.assertEqual(len(list(fc.fc2.children())), 3)
         self.assertEqual(len(list(fc.fc3.children())), 3)
-        self.assertEqual(len(list(fc.fc4.children())),
-                         1)  # no norm, no activation
+        self.assertEqual(len(list(fc.fc4.children())), 3)
 
-        self.assertRaises(AttributeError, getattr, fc.fc0, "dropout")
+        # self.assertRaises(AttributeError, getattr, fc.fc0, "dropout")
+        self.assertIsNotNone(fc.fc0.dropout)
         self.assertIsNotNone(fc.fc1.dropout)
         self.assertIsNotNone(fc.fc2.dropout)
         self.assertIsNotNone(fc.fc3.dropout)
-        self.assertRaises(AttributeError, getattr, fc.fc4, "dropout")
+        self.assertIsNotNone(fc.fc4.dropout)
+        # self.assertRaises(AttributeError, getattr, fc.fc4, "dropout")
 
     def test_variable_width(self):
         # Width should have 3-1 = 2 values
@@ -260,13 +259,15 @@ class TestFCChain(unittest.TestCase):
         self.assertEqual(len(list(fc.children())), 3)
 
     def test_variable_dropout(self):
-        # dropout should have 3-2 = 1 values
+        # dropout should have3 entries
         self.assertRaises(AssertionError, networks.FCChain,
                           self.c, self.c_out, depth=3, dropout=[0.2, 0.1])
         w = 32
-        fc = networks.FCChain(self.c, self.c_out, depth=3, dropout=[0.2])
+        fc = networks.FCChain(self.c, self.c_out, depth=3, dropout=[0.2, 0.1, 0.05])
         print(fc)
-        self.assertEqual(fc.fc1.dropout.p, 0.2)
+        self.assertEqual(fc.fc0.dropout.p, 0.2)
+        self.assertEqual(fc.fc1.dropout.p, 0.1)
+        self.assertEqual(fc.fc2.dropout.p, 0.05)
         self.assertEqual(len(list(fc.children())), 3)
 
 
