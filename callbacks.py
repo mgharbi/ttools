@@ -1,5 +1,9 @@
 """Callbacks that can be added to a model trainer's maiin loop."""
 
+# TODO: add epoch in extras of checkpointer
+# TODO: implement experiment logger
+# TODO: implement csv logger
+
 import abc
 import logging
 import random
@@ -11,9 +15,12 @@ import visdom
 
 from .utils import ExponentialMovingAverage
 
-LOG = logging.getLogger(__name__)
 
 __all__ = ["Callback"]
+
+
+LOG = logging.getLogger(__name__)
+
 
 class Callback(object):
     """Base class for all training callbacks."""
@@ -331,7 +338,6 @@ class CheckpointingCallback(Callback):
         LOG.debug("Periodic checkpoint")
         self.last_checkpoint_time = now
 
-        # TODO: add epoch in extras
         filename = "{}{}{}".format(self.prefix, CheckpointingCallback.PERIODIC_PREFIX,
                                    time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime()))
         self.checkpointer.save(filename)
@@ -402,7 +408,6 @@ class ImageDisplayCallback(Callback, abc.ABC):
 
 class ExperimentLoggerCallback(Callback):
     """A callback that logs experiment parameters in a log."""
-    # TODO
 
     def __init__(self, fname, meta=None):
         super(ExperimentLoggerCallback, self).__init__()
@@ -418,7 +423,6 @@ class ExperimentLoggerCallback(Callback):
 
 class CSVLoggingCallback(Callback):
     """A callback that logs scalar quantities to a .csv file."""
-    # TODO
     pass
 
 
