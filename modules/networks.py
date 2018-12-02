@@ -46,36 +46,31 @@ class FCChain(nn.Module):
 
     Args:
       n_in(int): number of input channels.
-      n_out(int): number of output channels.
       width(int or list of int): number of features channels in the intermediate layers.
       depth(int): number of layers
       activation(str): nonlinear activation function between convolutions.
       dropout(float or list of float): dropout ratio if defined, default to None: no dropout.
     """
 
-    def __init__(self, n_in, n_out, width=64, depth=3, activation="relu",
+    def __init__(self, n_in, width=64, depth=3, activation="relu",
                  dropout=None):
         super(FCChain, self).__init__()
 
         assert isinstance(
             n_in, int) and n_in > 0, "Input channels should be a positive integer"
         assert isinstance(
-            n_out, int) and n_out > 0, "Output channels should be a positive integer"
-        assert isinstance(
             depth, int) and depth > 0, "Depth should be a positive integer"
         assert isinstance(width, int) or isinstance(
             width, list), "Width should be a list or an int"
 
         _in = [n_in]
-        _out = [n_out]
 
         if isinstance(width, int):
             _in = _in + [width]*(depth-1)
-            _out = [width]*(depth-1) + _out
+            _out = [width]*depth
         elif isinstance(width, list):
-            assert depth > 1 and len(
-                width) == depth-1, "Needs at least two layers to specify width with a list. Do no specify out"
-            _in = _in + width
+            assert len(width) == depth, "Specifying width with a least: should have `depth` entries"
+            _in = _in + width[:-1]
             _out = width + _out
 
         _activations = [activation]*depth
@@ -153,7 +148,6 @@ class ConvChain(nn.Module):
 
     Args:
       n_in(int): number of input channels.
-      n_out(int): number of output channels.
       ksize(int or list of int): size of the convolution kernel (square).
       width(int or list of int): number of features channels in the intermediate layers.
       depth(int): number of layers
@@ -163,14 +157,12 @@ class ConvChain(nn.Module):
       norm_layer(str): normalization to apply between the convolution modules.
     """
 
-    def __init__(self, n_in, n_out, ksize=3, width=64, depth=3, strides=None, pad=True,
+    def __init__(self, n_in, ksize=3, width=64, depth=3, strides=None, pad=True,
                  activation="relu", norm_layer=None):
         super(ConvChain, self).__init__()
 
         assert isinstance(
             n_in, int) and n_in > 0, "Input channels should be a positive integer"
-        assert isinstance(
-            n_out, int) and n_out > 0, "Output channels should be a positive integer"
         assert (isinstance(ksize, int) and ksize > 0) or isinstance(
             ksize, list), "Kernel size should be a positive integer or a list of integers"
         assert isinstance(
@@ -179,7 +171,6 @@ class ConvChain(nn.Module):
             width, list), "Width should be a list or an int"
 
         _in = [n_in]
-        _out = [n_out]
 
         if strides is None:
             _strides = [1]*depth
@@ -190,12 +181,11 @@ class ConvChain(nn.Module):
 
         if isinstance(width, int):
             _in = _in + [width]*(depth-1)
-            _out = [width]*(depth-1) + _out
+            _out = [width]*depth
         elif isinstance(width, list):
-            assert depth > 1 and len(
-                width) == depth-1, "Needs at least two layers to specify width with a list."
-            _in = _in + width
-            _out = width + _out
+            assert len(width) == depth, "Specifying width with a list should have `depth` elements"
+            _in = _in + width[:-1]
+            _out = width
 
         if isinstance(ksize, int):
             _ksizes = [ksize]*depth
@@ -253,7 +243,7 @@ class DownConvChain(ConvChain):
         assert len(
             increase_factor) == num_levels, "increase_factor should have num_levels entries"
 
-        depth = num_levels*convs_per_level + 1
+        depth = num_levels*convs_per_level
         widths = []
         strides = []
         w = base_width
@@ -265,83 +255,11 @@ class DownConvChain(ConvChain):
                     strides.append(1)
                 widths.append(w)
             w = int(w*increase_factor[lvl])
-        strides.append(1)
+        # strides.append(1)
 
         super(DownConvChain, self).__init__(
             n_in, n_out, ksize=ksize, depth=depth, strides=strides, pad=pad,
-            activation=activation, norm_layer=norm_layer)
-
-# class ConvAutoencoder(nn.Module):
-#   """Convolutionnal autoencoder with a spatially downsampled bottleneck.
-#
-#   Args:
-#     n_in(int): number of input channels.
-#     n_out(int): number of output channels.
-#     ksize(int or list of int): size of the convolution kernel (square).
-#     width(int or list of int): number of features channels in the intermediate layers.
-#     depth(int): number of downsampling layers
-#     strides(list of int): stride between kernels. If None, defaults to 1 for all.
-#     pad(bool): if True, zero pad the convolutions to maintain a constant size.
-#     activation(str): nonlinear activation function between convolutions.
-#     norm_layer(str): normalization to apply between the convolution modules.
-#     out_activation(str): activation function applied to the output, defaults to linear (none).
-#   """
-#   def __init__(self, n_in, n_out, ksize=3, width=64, depth=3, strides=None, pad=True,
-#                activation="relu", norm_layer=None, out_activation=None):
-#     super(ConvAutoencoder, self).__init__()
-#
-#     self.encoder = DownConvChain(n_in, n_bottleneck, ksize=ksize, width=e_widths,
-#                              strides=e_strides, depth=e_depth, pad=pad,
-#                              activation=activation, norm_layer=norm_layer,
-#                              out_activation=activation)
-#
-#     self.decoder = UpConvChain()
-#
-#   def __init__(self, n_in, n_out, ksize=3, width=64, depth=3, strides=None, pad=True,
-#                activation="relu", norm_layer=None, out_activation=None):
-
-    def encode(self, x):
-        return self.encoder(x)
-
-    def decode(self, z):
-        return self.decode(z)
-
-    def forward(self, x):
-        return self.decode(self.encode(x))
-
-
-class UpConvChain(nn.Module):
-    pass
-
-
-class UNet(nn.Module):
-    """
-    """
-
-    def __init__(self):
-        pass
-
-    class _UNetLevel(nn.Module):
-        """
-        """
-
-        def __init__(self):
-            pass
-
-        def _encode(self):
-            pass
-
-        def _upsample(self):
-            pass
-
-        def forward(self, x):
-            encoded = self.encode(x)
-            if self.has_child():
-                ds = self.downsample(encoded)
-                lowres_features = self.child(ds)
-                us = self.upsample(lowres_features)
-                encoded = self.skip_connect(us, encoded)
-            return self.decode(encoded)
+            width=widths, activation=activation, norm_layer=norm_layer)
 
 
 def _get_norm_layer(norm_layer, channels):
