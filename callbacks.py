@@ -15,8 +15,6 @@ LOG = logging.getLogger(__name__)
 
 __all__ = ["Callback"]
 
-# TODO(mgharbi): smooth average in viz
-
 class Callback(object):
     """Base class for all training callbacks."""
 
@@ -331,11 +329,13 @@ class CheckpointingCallback(Callback):
             return
 
         LOG.debug("Periodic checkpoint")
+        self.last_checkpoint_time = now
 
         # TODO: add epoch in extras
         filename = "{}{}{}".format(self.prefix, CheckpointingCallback.PERIODIC_PREFIX,
                                    time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime()))
         self.checkpointer.save(filename)
+
 
         self.__purge_old_files()
 
