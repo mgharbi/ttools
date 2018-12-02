@@ -250,9 +250,16 @@ class ProgressBarCallback(KeyedCallback):
     def validation_start(self, dataloader):
         super(ProgressBarCallback, self).validation_start(dataloader)
         print(" "*ProgressBarCallback.TABSTOPS + "Running validation...")
+        self.pbar = tqdm(total=len(dataloader), unit=" batches",
+                         desc="Validation {}".format(self.epoch + 1))
+
+    def validation_step(self, fwd_data, val_data):
+        self.pbar.update(1)
 
     def validation_end(self, val_data):
         super(ProgressBarCallback, self).validation_end(val_data)
+        self.pbar.close()
+        self.pbar = None
         s = " "*ProgressBarCallback.TABSTOPS + "Validation {} | ".format(
             self.epoch + 1)
         for k in self.keys:

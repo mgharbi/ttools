@@ -208,7 +208,7 @@ class Trainer(object):
                 with th.no_grad():
                     val_data = self.__validation_start(
                         val_dataloader)  # data interface adapter
-                    for batch_idx, batch in enumerate(dataloader):
+                    for batch_idx, batch in enumerate(val_dataloader):
                         fwd_result = self.__forward_step(batch)
                         val_data = self.__validation_update(
                             batch, fwd_result, val_data)
