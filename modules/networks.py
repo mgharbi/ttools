@@ -116,7 +116,7 @@ class ConvModule(nn.Module):
       norm_layer(str): normalization to apply between the convolution modules.
     """
 
-    def __init__(self, n_in, n_out, ksize, stride=1, pad=True,
+    def __init__(self, n_in, n_out, ksize=3, stride=1, pad=True,
                  activation="relu", norm_layer=None):
         super(ConvModule, self).__init__()
 
@@ -358,10 +358,12 @@ def _get_norm_layer(norm_layer, channels):
 
 
 def _get_activation(activation):
-    valid = ["relu"]
+    valid = ["relu", "leaky_relu", "lrelu"]
     assert activation in valid, "activation should be one of {}".format(valid)
     if activation == "relu":
         return nn.ReLU(inplace=True)
+    if activation == "leaky_relu" or activation == "lrelu":
+        return nn.LeakyReLU(inplace=True)
     return None
 
 
