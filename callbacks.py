@@ -165,8 +165,8 @@ class LoggingCallback(KeyedCallback):
 
     TABSTOPS = 2
 
-    def __init__(self, name, keys=None, val_keys=None, frequency=100):
-        super(LoggingCallback, self).__init__(keys=keys, val_keys=val_keys)
+    def __init__(self, name, keys=None, val_keys=None, frequency=100, smoothing=0.99):
+        super(LoggingCallback, self).__init__(keys=keys, val_keys=val_keys, smoothing=smoothing)
 
         self.log = logging.getLogger(name)
         self.log.setLevel(logging.INFO)
@@ -219,7 +219,7 @@ class LoggingCallback(KeyedCallback):
             return
         self._step = 0
 
-        s = "{}.{} | ".format(self.epoch + 1, batch + 1)
+        s = "{}.{} | ".format(self.epoch + 1, self.batch + 1)
         for k in self.keys:
             s += "{} = {:.2f} ".format(k, bwd_data[k])
         self.__print(s)
