@@ -16,7 +16,7 @@ class FCModule(nn.Module):
       dropout(float): dropout ratio if defined, default to None: no dropout.
     """
 
-    def __init__(self, n_in, n_out, activation="relu", dropout=None):
+    def __init__(self, n_in, n_out, activation=None, dropout=None):
         super(FCModule, self).__init__()
 
         assert isinstance(
@@ -71,7 +71,7 @@ class FCChain(nn.Module):
         elif isinstance(width, list):
             assert len(width) == depth, "Specifying width with a least: should have `depth` entries"
             _in = _in + width[:-1]
-            _out = width + _out
+            _out = width
 
         _activations = [activation]*depth
 
@@ -112,7 +112,7 @@ class ConvModule(nn.Module):
     """
 
     def __init__(self, n_in, n_out, ksize=3, stride=1, pad=True,
-                 activation="relu", norm_layer=None):
+                 activation=None, norm_layer=None):
         super(ConvModule, self).__init__()
 
         assert isinstance(
@@ -211,55 +211,55 @@ class ConvChain(nn.Module):
         return x
 
 
-class DownConvChain(ConvChain):
-    """Chain of convolution layers with 2x spatial downsamplings.
-
-    Args:
-      n_in(int): number of input channels.
-      n_out(int): number of output channels.
-      ksize(int): size of the convolution kernel (square).
-      base_width(int): number of features channels in the intermediate layers.
-      increase_factor(float): multiplicative factor on feature size after downsampling.
-      num_levels(int): number of downsampling levels.
-      convs_per_level(int or list of ints): number of conv layers at each levels.
-      pad(bool): if True, zero pad the convolutions to maintain a constant size.
-      activation(str): nonlinear activation function between convolutions.
-      norm_layer(str): normalization to apply between the convolution modules.
-    """
-
-    def __init__(self, n_in, n_out, ksize=3, base_width=64, increase_factor=2.0,
-                 num_levels=3, convs_per_level=2, pad=True,
-                 activation="relu", norm_layer=None):
-
-        assert isinstance(
-            num_levels, int) and num_levels > 0, "num_levels should be a positive integer"
-        assert isinstance(convs_per_level, int) or isinstance(
-            convs_per_level, list), "convs_per_level should be a positive integer or list of ints"
-        assert isinstance(
-            increase_factor, float) and increase_factor >= 1.0, "increase_factor should be a float >= 1.0"
-
-        if (increase_factor, int):
-            increase_factor = [increase_factor]*num_levels
-        assert len(
-            increase_factor) == num_levels, "increase_factor should have num_levels entries"
-
-        depth = num_levels*convs_per_level
-        widths = []
-        strides = []
-        w = base_width
-        for lvl in range(num_levels):
-            for cv in range(convs_per_level):
-                if cv == convs_per_level-1:
-                    strides.append(2)
-                else:
-                    strides.append(1)
-                widths.append(w)
-            w = int(w*increase_factor[lvl])
-        # strides.append(1)
-
-        super(DownConvChain, self).__init__(
-            n_in, n_out, ksize=ksize, depth=depth, strides=strides, pad=pad,
-            width=widths, activation=activation, norm_layer=norm_layer)
+# class DownConvChain(ConvChain):
+#     """Chain of convolution layers with 2x spatial downsamplings.
+#
+#     Args:
+#       n_in(int): number of input channels.
+#       n_out(int): number of output channels.
+#       ksize(int): size of the convolution kernel (square).
+#       base_width(int): number of features channels in the intermediate layers.
+#       increase_factor(float): multiplicative factor on feature size after downsampling.
+#       num_levels(int): number of downsampling levels.
+#       convs_per_level(int or list of ints): number of conv layers at each levels.
+#       pad(bool): if True, zero pad the convolutions to maintain a constant size.
+#       activation(str): nonlinear activation function between convolutions.
+#       norm_layer(str): normalization to apply between the convolution modules.
+#     """
+#
+#     def __init__(self, n_in, n_out, ksize=3, base_width=64, increase_factor=2.0,
+#                  num_levels=3, convs_per_level=2, pad=True,
+#                  activation="relu", norm_layer=None):
+#
+#         assert isinstance(
+#             num_levels, int) and num_levels > 0, "num_levels should be a positive integer"
+#         assert isinstance(convs_per_level, int) or isinstance(
+#             convs_per_level, list), "convs_per_level should be a positive integer or list of ints"
+#         assert isinstance(
+#             increase_factor, float) and increase_factor >= 1.0, "increase_factor should be a float >= 1.0"
+#
+#         if (increase_factor, int):
+#             increase_factor = [increase_factor]*num_levels
+#         assert len(
+#             increase_factor) == num_levels, "increase_factor should have num_levels entries"
+#
+#         depth = num_levels*convs_per_level
+#         widths = []
+#         strides = []
+#         w = base_width
+#         for lvl in range(num_levels):
+#             for cv in range(convs_per_level):
+#                 if cv == convs_per_level-1:
+#                     strides.append(2)
+#                 else:
+#                     strides.append(1)
+#                 widths.append(w)
+#             w = int(w*increase_factor[lvl])
+#         # strides.append(1)
+#
+#         super(DownConvChain, self).__init__(
+#             n_in, n_out, ksize=ksize, depth=depth, strides=strides, pad=pad,
+#             width=widths, activation=activation, norm_layer=norm_layer)
 
 
 def _get_norm_layer(norm_layer, channels):
