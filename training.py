@@ -347,9 +347,9 @@ class Checkpointer(object):
             LOG.debug("Loading model state dict")
             self.model.load_state_dict(chkpt["model"])
 
-        if self.optimizer is not None and chkpt["optimizer"] is not None:
-            LOG.debug("Loading optimizer state dict")
-            self.optimizer.load_state_dict(chkpt["optimizer"])
+        # if self.optimizer is not None and chkpt["optimizer"] is not None:
+        #     LOG.debug("Loading optimizer state dict")
+        #     self.optimizer.load_state_dict(chkpt["optimizer"])
 
         LOG.debug("Loaded checkpoint \"{}\"".format(filename))
         return tuple(chkpt[k] for k in ["extras", "meta"])
