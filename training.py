@@ -255,7 +255,7 @@ class Trainer(object):
 
     def __validation_update(self, batch, fwd_data, val_data):
         for cb in self.callbacks:
-            cb.validation_step(fwd_data, val_data)
+            cb.validation_step(batch, fwd_data, val_data)
         return self.interface.update_validation(batch, fwd_data, val_data)
 
     def __validation_end(self, val_data):
@@ -284,11 +284,10 @@ class Checkpointer(object):
 
     EXTENSION = ".pth"
 
-    def __init__(self, root, model=None, optimizer=None, meta=None, prefix=None):
+    def __init__(self, root, model=None, meta=None, prefix=None):
         self.root = root
         self.model = model
         self.meta = meta
-        self.optimizer = optimizer
 
         LOG.debug(self)
 
@@ -299,18 +298,12 @@ class Checkpointer(object):
         return os.path.join(self.root, os.path.splitext(path)[0] + ".pth")
 
     def save(self, path, extras=None):
-        """Save model, optimizer, metaparams and extras to relative path.
+        """Save model, metaparams and extras to relative path.
 
         Args:
           path (string): relative path to the file being saved (without extension).
           extras (dict): extra user-provided information to be saved with the model.
         """
-
-        if self.optimizer is None:
-            optimizer_state = None
-        else:
-            LOG.debug("Saving optimizer state dict")
-            optimizer_state = self.optimizer.state_dict()
 
         if self.model is None:
             model_state = None
@@ -321,14 +314,13 @@ class Checkpointer(object):
         filename = self.__path(path)
         os.makedirs(self.root, exist_ok=True)
         th.save({'model': model_state,
-                 'optimizer': optimizer_state,
                  'meta': self.meta,
                  'extras': extras,
                  }, filename)
         LOG.debug("Checkpoint saved to \"{}\"".format(filename))
 
     def load(self, path):
-        """Loads a checkpoint, updates the model and optimizer and returns extra data.
+        """Loads a checkpoint, updates the model and returns extra data.
 
         Args:
           path (string): path to the checkpoint file, relative to the root dir.
@@ -338,18 +330,12 @@ class Checkpointer(object):
           meta (dict): metaparameters of the model passed at save time.
         """
 
-        # TODO: handle case where we don't want to load the optimizer params (e.g. changing optimizer)
-
         filename = self.__path(path)
         chkpt = th.load(filename)
 
         if self.model is not None and chkpt["model"] is not None:
             LOG.debug("Loading model state dict")
             self.model.load_state_dict(chkpt["model"])
-
-        # if self.optimizer is not None and chkpt["optimizer"] is not None:
-        #     LOG.debug("Loading optimizer state dict")
-        #     self.optimizer.load_state_dict(chkpt["optimizer"])
 
         LOG.debug("Loaded checkpoint \"{}\"".format(filename))
         return tuple(chkpt[k] for k in ["extras", "meta"])

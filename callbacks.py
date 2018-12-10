@@ -1,6 +1,5 @@
 """Callbacks that can be added to a model trainer's maiin loop."""
 
-# TODO: add epoch in extras of checkpointer
 # TODO: implement experiment logger
 # TODO: implement csv logger
 
@@ -8,6 +7,7 @@ import abc
 import logging
 import random
 import string
+import subprocess
 import time
 
 from tqdm import tqdm
@@ -52,7 +52,7 @@ class Callback(object):
     def validation_start(self, dataloader):
         self.val_datasize = len(dataloader)
 
-    def validation_step(self, fwd_data, val_data):
+    def validation_step(self, batch, fwd_data, val_data):
         pass
 
     def validation_end(self, val_data):
@@ -258,7 +258,7 @@ class ProgressBarCallback(KeyedCallback):
         self.pbar = tqdm(total=len(dataloader), unit=" batches",
                          desc="Validation {}".format(self.epoch + 1))
 
-    def validation_step(self, fwd_data, val_data):
+    def validation_step(self, batch, fwd_data, val_data):
         self.pbar.update(1)
 
     def validation_end(self, val_data):
@@ -287,6 +287,7 @@ class CheckpointingCallback(Callback):
 
     Args:
       checkpointer (Checkpointer): actual checkpointer responsible for the I/O.
+      start_epoch (int or None): index of the starting epoch (e.g. when resuming from a previous checkpoint).
       interval (int, optional): minimum time in seconds between periodic checkpoints
         (within an epoch). There is not periodic checkpoint if this value is None.
       max_files (int, optional): maximum number of periodic checkpoints to keep on disk. Note:
@@ -296,7 +297,7 @@ class CheckpointingCallback(Callback):
     PERIODIC_PREFIX = "periodic_"
     EPOCH_PREFIX = "epoch_"
 
-    def __init__(self, checkpointer, interval=600, max_files=5, prefix=None):
+    def __init__(self, checkpointer, start_epoch=None, interval=600, max_files=5, prefix=None):
         super(CheckpointingCallback, self).__init__()
         self.checkpointer = checkpointer
         self.interval = interval
@@ -308,16 +309,25 @@ class CheckpointingCallback(Callback):
         if prefix is not None:
             self.prefix = prefix
 
+        if start_epoch is None:
+            self.start_epoch = 0
+        else:
+            self.start_epoch = start_epoch
+
+    def get_extras(self):
+        return {"epoch": self.epoch + self.start_epoch}
+
     def epoch_end(self):
         """Save a checkpoint at the end of each epoch."""
 
         super(CheckpointingCallback, self).epoch_end()
-        self.checkpointer.save("{}{}{}".format(self.prefix, CheckpointingCallback.EPOCH_PREFIX,
-                                               self.epoch))
+        path = "{}{}{}".format(self.prefix, CheckpointingCallback.EPOCH_PREFIX, self.epoch)
+        self.checkpointer.save(path, extras=self.get_extras())
+        self.__purge_old_files()
 
     def training_end(self):
         super(CheckpointingCallback, self).training_end()
-        self.checkpointer.save("{}training_end".format(self.prefix))
+        self.checkpointer.save("{}training_end".format(self.prefix), extras=self.get_extras())
 
     def batch_end(self, batch_data, fwd_result, bwd_result):
         """Save a periodic checkpoint if requested."""
@@ -340,9 +350,7 @@ class CheckpointingCallback(Callback):
 
         filename = "{}{}{}".format(self.prefix, CheckpointingCallback.PERIODIC_PREFIX,
                                    time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime()))
-        self.checkpointer.save(filename)
-
-
+        self.checkpointer.save(filename, extras=self.get_extras())
         self.__purge_old_files()
 
     def __purge_old_files(self):
@@ -352,12 +360,21 @@ class CheckpointingCallback(Callback):
 
         chkpts = self.checkpointer.sorted_checkpoints()
         p_chkpts = []
+        e_chkpts = []
         for c in chkpts:
             if c.startswith(self.prefix + CheckpointingCallback.PERIODIC_PREFIX):
                 p_chkpts.append(c)
 
+            if c.startswith(self.prefix + CheckpointingCallback.EPOCH_PREFIX):
+                e_chkpts.append(c)
+
         if len(p_chkpts) > self.max_files:
             for c in p_chkpts[self.max_files:]:
+                LOG.debug("CheckpointingCallback deleting {}".format(c))
+                self.checkpointer.delete(c)
+
+        if len(e_chkpts) > self.max_files:
+            for c in e_chkpts[self.max_files:]:
                 LOG.debug("CheckpointingCallback deleting {}".format(c))
                 self.checkpointer.delete(c)
 
@@ -385,10 +402,10 @@ class ImageDisplayCallback(Callback, abc.ABC):
             self.win = win
 
     @abc.abstractmethod
-    def visualized_image(self, batch, fwd_result, bwd_result):
+    def visualized_image(self, batch, fwd_result):
         pass
 
-    def caption(self, batch, fwd_result, bwd_result):
+    def caption(self, batch, fwd_result):
         return ""
 
     def batch_end(self, batch, fwd_result, bwd_result):
@@ -398,12 +415,30 @@ class ImageDisplayCallback(Callback, abc.ABC):
 
         self._step = 0
 
-        caption = self.caption(batch, fwd_result, bwd_result)
-        opts = {"caption": "Epoch {}, batch {}: {}".format(self.epoch, self.batch, caption)}
+        caption = self.caption(batch, fwd_result)
+        opts = {"caption": "Epoch {}, batch {}: {}".format(
+            self.epoch, self.batch, caption)}
 
-        viz = self.visualized_image(batch, fwd_result, bwd_result)
+        viz = self.visualized_image(batch, fwd_result)
         self._api.images(viz, win=self.win, opts=opts)
         self._step += 1
+
+    def validation_start(self, dataloader):
+        super(ImageDisplayCallback, self).validation_start(dataloader)
+        self.first_step = True
+
+    def validation_step(self, batch, fwd_data, val_data):
+        super(ImageDisplayCallback, self).validation_step(batch, fwd_data, val_data)
+        if not self.first_step:
+            return
+
+        caption = self.caption(batch, fwd_data)
+        opts = {"caption": "Validation {}, batch {}: {}".format(
+            self.epoch, self.batch, caption)}
+
+        viz = self.visualized_image(batch, fwd_data)
+        self._api.images(viz, win=self.win+"_val", opts=opts)
+        self.first_step = False
 
 
 class ExperimentLoggerCallback(Callback):
@@ -419,6 +454,9 @@ class ExperimentLoggerCallback(Callback):
     def training_end(self):
         super(ExperimentLoggerCallback, self).training_end()
         print("end logging experiment", self.epoch, self.batch)
+
+    def _get_commit(self):
+       return subprocess.check_output(["git", "rev-parse", "HEAD"]) 
 
 
 class CSVLoggingCallback(Callback):
