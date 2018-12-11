@@ -1,6 +1,8 @@
 """Collections of loss functions."""
 import torch as th
 
+from torchvision import models
+
 
 class PSNR(th.nn.Module):
     def __init__(self):
@@ -9,6 +11,54 @@ class PSNR(th.nn.Module):
     def forward(self, out, ref):
         mse = self.mse(out, ref)
         return -10*th.log10(mse)
+
+class PerceptualLoss(th.nn.Module):
+    def __init__(self):
+        super(PerceptualLoss, self).__init__()
+        self.feature_extractor = PerceptualLoss._FeatureExtractor()
+        self.mse = th.nn.MSELoss()
+
+    def forward(self, out, ref):
+        out_f = self.feature_extractor(out)
+        ref_f = self.feature_extractor(ref)
+
+        scores = []
+        for idx, (o_f, r_f) in enumerate(zip(out_f, ref_f)):
+            scores.append(self._cos_sim(o_f, r_f))
+        return sum(scores)
+
+    def _normalize(self, a, eps=1e-10):
+        nrm = th.sum(a*a, 1, keepdim=True)
+        return a / th.sqrt(a + eps)
+
+    def _cos_sim(self, a, b):
+        # ||a-b||^2 = ||a||^2 + ||b||^2 - 2<a|b>, with ||a|| = ||b|| = 1
+        return self.mse(self._normalize(a), self._normalize(b))*0.5
+
+    class _FeatureExtractor(th.nn.Module):
+        def __init__(self):
+            super(PerceptualLoss._FeatureExtractor, self).__init__()
+            vgg_pretrained = models.vgg16(pretrained=True).features
+            breakpoints = [0, 4, 9, 16, 23, 30]
+            for i, b in enumerate(breakpoints[:-1]):
+                ops = th.nn.Sequential()
+                for idx in range(b, breakpoints[i+1]):
+                    ops.add_module(str(idx), vgg_pretrained[idx])
+                self.add_module("group{}".format(i), ops)
+
+            for p in self.parameters():
+                p.requires_grad = False
+
+            self.register_buffer("shift", th.Tensor([-0.030, -0.088, -0.188]).view(1, 3, 1, 1))
+            self.register_buffer("scale", th.Tensor([0.458, 0.448, 0.450]).view(1, 3, 1, 1))
+
+        def forward(self, x):
+            feats = []
+            x = (x-self.shift) / self.scale
+            for m in self.children():
+                x = m(x)
+                feats.append(x)
+            return feats
 
 
 # import torch.nn as nn
