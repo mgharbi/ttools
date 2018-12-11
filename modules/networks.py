@@ -3,6 +3,7 @@
 # TODO(mgharbi): maybe add a norm layer at the output if we specify an activation fn ?
 
 
+import torch as th
 from torch import nn
 
 
@@ -209,6 +210,84 @@ class ConvChain(nn.Module):
         for m in self.children():
             x = m(x)
         return x
+
+class UNet(nn.Module):
+    """Simple UNet with downsampling and concat operations.
+
+    Args:
+      n_in(int): number of input channels.
+      n_out(int): number of input channels.
+      ksize(int): size of the convolution kernel (square).
+      width(int): number of features channels in the first hidden layers.
+      increase_factor(float): ratio of feature increase between scales.
+      num_convs(int): number of conv layers per level
+      num_levels(int): number of scales
+      activation(str): nonlinear activation function between convolutions.
+      norm_layer(str): normalization to apply between the convolution modules.
+    """
+    def _width(self, lvl):
+        return min(self.base_width*self.increase_factor**(lvl), self.max_width)
+
+    def __init__(self, n_in, n_out, ksize=3, base_width=64, max_width=512, increase_factor=2,
+                 num_convs=1, num_levels=4, activation="relu", norm_layer=None,
+                 interp_mode="bilinear"):
+        super(UNet, self).__init__()
+
+        self.increase_factor = increase_factor
+        self.max_width = max_width
+        self.base_width = base_width
+
+        child = None
+        lvl_in = []
+        for lvl in range(num_levels-1, -1, -1):
+            lvl_w = self._width(lvl)
+            n_child_out = self._width(lvl)
+            if lvl == 0:
+                lvl_in = n_in
+                lvl_out = n_out
+            else:
+                lvl_in = self._width(lvl-1)
+                lvl_out = self._width(lvl-1)
+                if lvl == num_levels-1:
+                    n_child_out = 0
+
+            u_lvl = UNet._UNetLevel(
+                lvl_in, lvl_out, lvl_w, ksize, num_convs, activation,
+                norm_layer, child=child, n_child_out=n_child_out,
+                interp_mode=interp_mode)
+            child = u_lvl
+        self.top_level = u_lvl
+
+    def forward(self, x):
+        return self.top_level(x)
+
+    class _UNetLevel(nn.Module):
+        def __init__(self, n_in, n_out, width, ksize, num_convs, activation,
+                     norm_layer, child=None, n_child_out=0, interp_mode="bilinear"):
+            super(UNet._UNetLevel, self).__init__()
+            self.left = ConvChain(n_in, ksize=ksize, width=width, depth=num_convs, pad=True,
+                                  activation=activation, norm_layer=norm_layer)
+            w = [width] * (num_convs-1) + [n_out]
+            self.right = ConvChain(width + n_child_out, ksize=ksize, width=w, depth=num_convs, pad=True,
+                                  activation=activation, norm_layer=norm_layer)
+            self.child = child
+            self.interp_mode=interp_mode
+
+        def forward(self, x):
+            left_features = self.left(x)
+            if self.child is not None:
+                ds = nn.functional.interpolate(
+                    left_features, scale_factor=0.5, mode=self.interp_mode)
+                child_features = self.child(ds)
+                us = nn.functional.interpolate(
+                    child_features, size=left_features.shape[-2:],
+                    mode=self.interp_mode)
+
+                # skip connection
+                left_features = th.cat([left_features, us], 1)
+            output = self.right(left_features)
+            return output
+
 
 
 # class DownConvChain(ConvChain):

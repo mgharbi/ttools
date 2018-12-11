@@ -278,6 +278,21 @@ class TestFCChain(unittest.TestCase):
         self.assertEqual(fc.fc2.dropout.p, 0.05)
         self.assertEqual(len(list(fc.children())), 3)
 
+class TestUnet(unittest.TestCase):
+    def setUp(self):
+        self.bs = 1
+        self.c = 3
+        self.c_out = 4
+        self.h = 128
+        self.w = 128
+        self.in_data = th.ones(self.bs, self.c, self.h, self.w)
+
+    def test_default(self):
+        unet = networks.UNet(self.c, self.c_out)
+        print(unet)
+        out = unet(self.in_data)
+    
+
 
 # class TestDownConvChain(unittest.TestCase):
 #     def setUp(self):
