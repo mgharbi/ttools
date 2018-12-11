@@ -137,8 +137,7 @@ class ModelInterface(metaclass=ABCMeta):
           validation_data (dict): initialized values
         """
 
-        validation_data = {}
-        return validation_data
+        return running_data
 
     def __repr__(self):
         return self.__class__.__name__
