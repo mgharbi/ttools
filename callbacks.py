@@ -116,11 +116,17 @@ class VisdomLoggingCallback(KeyedCallback):
         self._opts = {}
 
         # Cleanup previous plots and setup options
-        for k in self.keys:
+        all_keys = set(self.keys + self.val_keys)
+        for k in list(all_keys):
             if self._api.win_exists(k):
                 self._api.close(k)
+            legend = []
+            if k in self.keys:
+                legend.append("train")
+            if k in self.val_keys:
+                legend.append("val")
             self._opts[k] = {
-                "legend": ["train", "val"], "title": k, "xlabel": "epoch", "ylabel": k}
+                "legend": legend, "title": k, "xlabel": "epoch", "ylabel": k}
             if log:
                 self._opts[k]["ytype"] = "log"
 
@@ -267,7 +273,7 @@ class ProgressBarCallback(KeyedCallback):
         self.pbar = None
         s = " "*ProgressBarCallback.TABSTOPS + "Validation {} | ".format(
             self.epoch + 1)
-        for k in self.keys:
+        for k in self.val_keys:
             s += "{} = {:.2f} ".format(k, val_data[k])
         print(s)
 
