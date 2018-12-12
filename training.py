@@ -208,6 +208,9 @@ class Trainer(object):
                     val_data = self.__validation_start(
                         val_dataloader)  # data interface adapter
                     for batch_idx, batch in enumerate(val_dataloader):
+                        if not self._keep_running:
+                            self._stop()
+                            return
                         fwd_result = self.__forward_step(batch)
                         val_data = self.__validation_update(
                             batch, fwd_result, val_data)
@@ -391,23 +394,3 @@ class Checkpointer(object):
 
         _, meta = chkptr.load_latest()
         return meta
-
-#   # Load init weights from a source checkpoint
-#   def override_params(self, filename, ignore=None):
-#     ov_chkpt = th.load(filename)
-#     tgt = self.model.state_dict()
-#     src = ov_chkpt["state_dict"]
-#     names = []
-#     if ignore is not None:
-#       ignore = re.compile(ignore)
-#
-#     for name, param in src.items():
-#       if name in tgt and tgt[name].shape == param.shape:
-#         if ignore is not None and ignore.match(name):
-#           continue
-#         s = "{:10.10s}".format(name)
-#         s += " {:.2f} ({:.2f})".format(tgt[name].cpu().mean(), tgt[name].cpu().std())
-#         tgt[name].copy_(param)
-#         s += " -> {:.2f} ({:.2f})".format(param.cpu().mean(), param.cpu().std())
-#         names.append(s)
-#     return names
