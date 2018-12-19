@@ -23,6 +23,8 @@ class BasicArgumentParser(argparse.ArgumentParser):
         self.add_argument("--checkpoint_dir", required=True,
                           help="Output directory where checkpoints are saved")
 
+        self.add_argument("--init_from", help="path to a checkpoint from which to try and initialize the weights.")
+
         self.add_argument("--val_data", help="")
 
         self.add_argument("--lr", type=float, default=1e-4,
@@ -320,6 +322,23 @@ class Checkpointer(object):
                  'extras': extras,
                  }, filename)
         LOG.debug("Checkpoint saved to \"{}\"".format(filename))
+
+    def try_and_init_from(self, path):
+        if not os.path.exists(path):
+            raise ValueError("Checkpoint {} does not exist".format(path))
+        chkpt = th.load(path)
+        if "model" not in chkpt.keys() or chkpt["model"] is None:
+            raise ValueError("{} has no model saved".format(path))
+        mdl = chkpt["model"]
+        for n, p in self.model.named_parameters():
+            if n in mdl:
+                p2 = mdl[n]
+                if p2.shape != p.shape:
+                    LOG.info("Parameter {} ignored, checkpoint size does not match: {}, should be {}".format(n, p2.shape, p.shape))
+                    continue
+                p.data.copy_(p2)
+            else:
+                LOG.info("Parameter {} ignored, not found in source checkpoint.".format(n))
 
     def load(self, path):
         """Loads a checkpoint, updates the model and returns extra data.
