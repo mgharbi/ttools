@@ -324,6 +324,7 @@ class Checkpointer(object):
         LOG.debug("Checkpoint saved to \"{}\"".format(filename))
 
     def try_and_init_from(self, path):
+        LOG.info("Loading weights from foreign checkpoint {}".format(path))
         if not os.path.exists(path):
             raise ValueError("Checkpoint {} does not exist".format(path))
         chkpt = th.load(path)
@@ -378,7 +379,7 @@ class Checkpointer(object):
                 return extras, meta
             except Exception as e:
                 LOG.debug(
-                    "Could not load checkpoint \"{}\", moving on.".format(f))
+                    "Could not load checkpoint \"{}\", moving on ({}).".format(f, e))
         LOG.debug("No checkpoint found to load.")
         return extras, meta
 
