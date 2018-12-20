@@ -17,7 +17,7 @@ def crop_like(src, tgt):
     assert (np.mod(crop, 2) == 0).all(), "crop like sizes should be even"
     crop //= 2
     if (crop > 0).any():
-        return src[..., crop[0]:src_sz[2]-crop[0], crop[1]:src_sz[3]-crop[1]]
+        return src[..., crop[0]:src_sz[-2]-crop[0], crop[1]:src_sz[-1]-crop[1]]
     else:
         return src
 
