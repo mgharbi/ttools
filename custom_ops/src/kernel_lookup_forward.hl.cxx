@@ -21,49 +21,27 @@ public:
 
 
         if(get_target().has_gpu_feature()) {
-            // output
-            //     .fuse(x, y, xy)
-            //     .fuse(c, n, cn)
-            //     .fuse(xy, cn, allvars)
-            //     .gpu_tile(allvars, tx, 1024)
-            //     ;
-            //
-            // sum_w
-            //     .fuse(x, y, xy)
-            //     .fuse(xy, n, allvars)
-            //     .gpu_tile(allvars, tx, 1024)
-            //     ;
-            //
-            // funcs["summed"]
-            //     .compute_root()
-            //     .gpu_tile(x, y, tx, ty, ts, ts)
-            //     .update()
-            //     .gpu_tile(x, y, tx, ty, ts, ts)
-            //     ;
+            output
+                .fuse(x, y, xy)
+                .fuse(c, n, cn)
+                .fuse(xy, cn, allvars)
+                .gpu_tile(allvars, tx, 1024)
+                ;
+            output
+                .update()
+                .fuse(x, y, xy)
+                .fuse(c, n, cn)
+                .fuse(xy, cn, allvars)
+                .gpu_tile(allvars, tx, 1024)
+                ;
         } else {
-            // output
-            //     .compute_root()
-            //     .fuse(c, n, cn)
-            //     .fuse(y, cn, allvars)
-            //     .parallel(allvars, 8)
-            //     .vectorize(x, 8)
-            //     ;
-            //
-            // sum_w
-            //     .compute_root()
-            //     .fuse(y, n, allvars)
-            //     .parallel(allvars, 8)
-            //     .vectorize(x, 8)
-            //     ;
-            //
-            // funcs["summed"]
-            //     .compute_root()
-            //     .parallel(y, 8)
-            //     .vectorize(x, 8)
-            //     .update()
-            //     .parallel(y, 8)
-            //     .vectorize(x, 8)
-            //     ;
+            output
+                .compute_root()
+                .fuse(c, n, cn)
+                .fuse(y, cn, allvars)
+                .parallel(allvars, 8)
+                .vectorize(x, 8)
+                ;
         }
     }
 

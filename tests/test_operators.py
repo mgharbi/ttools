@@ -145,35 +145,55 @@ class TestScatter2Gather(unittest.TestCase):
 
 
 class TestKernelLookup(unittest.TestCase):
-  def test_kernel_lookup(self, gpu=th.cuda.is_available()):
+  def setUp(self):
     bs = 4
     ci = 1
     co = 3
     h = 16
     w = 16
+    self.ksize = 5
+    self.nkernels = 64
 
-    ksize = 3
+    self.data = th.zeros(bs, ci, h, w, requires_grad=False)
+    self.kernel_idx = th.ones(bs, co, h, w, requires_grad=False).int()
+    self.weights = th.ones(self.nkernels, ci, self.ksize, self.ksize, requires_grad=False)
 
-    nkernels = 8
+    if th.cuda.is_available():
+      self.data = self.data.cuda()
+      self.kernel_idx = self.kernel_idx.cuda()
+      self.weights = self.weights.cuda()
+  #
+  # def test_kernel_lookup(self):
+  #   for i in range(5):
+  #     o = funcs.KernelLookup.apply(self.data, self.kernel_idx, self.weights)
+  #
+  #   with profiler.profile(use_cuda=th.cuda.is_available()) as prof:
+  #     for i in range(1):
+  #       o = funcs.KernelLookup.apply(self.data, self.kernel_idx, self.weights)
+  #   print(prof)
+  #   print(o.mean().item())
 
-    data = th.ones(bs, ci, h, w, requires_grad=False)
-    kernel_idx = th.ones(bs, co, h, w, requires_grad=False).int()
-    weights = th.ones(nkernels, ci, ksize, ksize, requires_grad=False)
+  def test_choose_right_kernel(self):
+    # Each output channel uses a different kernel
+    self.kernel_idx[0, 0, 5, 3] = 1
+    self.kernel_idx[0, 1, 5, 4] = 2  # next channel, pixel to the right
+    self.kernel_idx[0, 2, 6, 3] = 3  # next chanel, pixel below
 
-    if gpu:
-      data = data.cuda()
-      kernel_idx = kernel_idx.cuda()
-      weights = weights.cuda()
+    # Set those kernels
+    self.weights.fill_(0.0)
+    self.weights[1, 0, 2, 2] = 1  # centered
+    self.weights[2, 0, 2, 1] = 1  # pixel to the left
+    self.weights[3, 0, 1, 2] = 1  # pixel above
 
-    # print("profiling")
-    # for i in range(5):
-    o = funcs.KernelLookup.apply(data, kernel_idx, weights)
+    # A single dirac in the input data
+    self.data.fill_(0.0)
+    self.data[0, :, 5, 3] = 1.0
 
-    print(o)
+    # Filter
+    o = funcs.KernelLookup.apply(self.data, self.kernel_idx, self.weights)
 
-    # with profiler.profile(use_cuda=gpu) as prof:
-    #   for i in range(1):
-    #     o, s = funcs.KernelWeighting.apply(data, weights)
-    #     loss = o.mean()
-    #     loss.backward()
-    # print(prof)
+    # Check the kernel assignments are correct
+    self.assertLess((o[0, 0] - self.data[0, 0]).abs().sum(), 1e-8)
+    self.assertAlmostEqual(o[0, 1, 5, 4].item(), 1.0)
+    self.assertAlmostEqual(o[0, 2, 6, 3].item(), 1.0)
+

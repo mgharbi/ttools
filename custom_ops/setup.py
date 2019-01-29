@@ -6,10 +6,12 @@ from setuptools import setup, find_packages
 from torch.utils.cpp_extension import BuildExtension
 import torch as th
 
-def generate_pybind_wrapper(path, headers):
+def generate_pybind_wrapper(path, headers, has_cuda):
   s = "#include <torch/extension.h>\n"
+  if has_cuda:
+    s += "#define HL_PT_CUDA\n"
+  s += "#include <HalidePytorchHelpers.h>\n"
   for h in headers:
-    print(h)
     s += "#include \"{}\"\n".format(os.path.splitext(h)[0]+".pytorch.h")
   s += "PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {\n"
   for h in headers:
@@ -31,7 +33,7 @@ if not os.path.exists(halide_dir):
   raise ValueError("Halide directory {} is invalid".format(halide_dir))
 
 include_dirs = [os.path.join(abs_path, "build"), os.path.join(halide_dir, "include")]
-compile_args = ["-std=c++11"]
+compile_args = ["-std=c++11", "-g"]
 if platform.system() == "Darwin":
   compile_args += ["-stdlib=libc++"]  # on osx libstdc++ causes trouble
 
@@ -57,7 +59,7 @@ for f in hl_srcs:
   # TODO: add cuda hl lib
 
 wrapper_path = os.path.join(build_dir, "pybind_wrapper.cpp")
-generate_pybind_wrapper(wrapper_path, hl_headers)
+generate_pybind_wrapper(wrapper_path, hl_headers, th.cuda.is_available())
 
 sources = [wrapper_path]
 # sources = hl_sources + [wrapper_path]

@@ -86,14 +86,12 @@ class KernelLookup(th.autograd.Function):
   """"""
   @staticmethod
   def forward(ctx, data, kernel_idx, weights):
-    print("ok")
     bs, ci, h, w = data.shape
     co = kernel_idx.shape[1]
     output = data.new()
     output.resize_(bs, co, h, w)
-    if _is_cuda(data, weights):
-      pass
-      # ops.kernel_lookup_forward_cuda(data, weights, output, sum_w)
+    if _is_cuda(data, kernel_idx, weights):
+      ops.kernel_lookup_forward_cuda(data, kernel_idx, weights, output)
     else:
       ops.kernel_lookup_forward(data, kernel_idx, weights, output)
     ctx.save_for_backward(data, kernel_idx, weights)

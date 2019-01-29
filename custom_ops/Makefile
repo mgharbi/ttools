@@ -73,7 +73,7 @@ endif
 # Assemble all the custom operators in a single shared library to be loaded by Python
 _ext/operators/_operators.so: $(CUDA_OPS_LIBS) $(CUDA_OBJ) $(OPS_LIBS)
 	@echo Installing python module
-	@$(PYTHON) setup.py install
+	@$(PYTHON) setup.py install 2>&1 > /dev/null
 
 # Rule for pure cuda kernels
 # $(BUILD_DIR)/%_cuda.so: $(SRC_DIR)/cuda_kernels/%.cu.cc $(SRC_DIR)/cuda_kernels/%.h $(BUILD_DIR)
@@ -119,14 +119,14 @@ clean:
 
 submodules:
 	@echo "Updating submodules"
-	git submodule init
-	git submodule update --recursive
+	@git submodule init
+	@git submodule update --recursive
 
-gradient-halide: submodules
+gradient-halide: #submodules
 	@echo "Building gradient halide"
-	$(MAKE) -j distrib -C $@
+	@$(MAKE) -j distrib -C $@
 
-.PHONY: gradient-halide
+.PHONY: submodules
 
 DEPS = $(wildcard $(BUILD_DIR)/*.d)
 -include $(DEPS)
