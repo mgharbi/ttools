@@ -1,13 +1,15 @@
 import numpy as np
 import torch as th
 
+
 def crop_like(src, tgt):
     """Crop a source image to match the spatial dimensions of a target.
 
     Assumes sizes are even.
 
-    src (th.Tensor or np.ndarray): image to be cropped
-    tgt (th.Tensor or np.ndarray): reference image
+    Args:
+        src (th.Tensor or np.ndarray): image to be cropped
+        tgt (th.Tensor or np.ndarray): reference image
     """
     src_sz = np.array(src.shape)
     tgt_sz = np.array(tgt.shape)

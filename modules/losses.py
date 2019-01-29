@@ -12,6 +12,7 @@ class PSNR(th.nn.Module):
         mse = self.mse(out, ref)
         return -10*th.log10(mse)
 
+
 class PerceptualLoss(th.nn.Module):
     def __init__(self):
         super(PerceptualLoss, self).__init__()
