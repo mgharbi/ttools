@@ -1,6 +1,6 @@
-all: custom_ops test coverage
+all: test
 
-test:
+test: custom_ops
 	py.test tests
 
 coverage:
@@ -11,4 +11,3 @@ custom_ops:
 	$(MAKE) -C $@
 
 .PHONY: custom_ops
-

@@ -85,30 +85,31 @@ class KernelWeighting(th.autograd.Function):
 class KernelLookup(th.autograd.Function):
   """"""
   @staticmethod
-  def forward(ctx, data, weights):
-    bs, c, h, w = data.shape
+  def forward(ctx, data, kernel_idx, weights):
+    print("ok")
+    bs, ci, h, w = data.shape
+    co = kernel_idx.shape[1]
     output = data.new()
-    sum_w = data.new()
-    output.resize_as_(data)
-    sum_w.resize_(bs, h, w)
+    output.resize_(bs, co, h, w)
     if _is_cuda(data, weights):
-      ops.kernel_weighting_forward_cuda(data, weights, output, sum_w)
+      pass
+      # ops.kernel_lookup_forward_cuda(data, weights, output, sum_w)
     else:
-      ops.kernel_weighting_forward(data, weights, output, sum_w)
-    ctx.save_for_backward(data, weights, sum_w)
-    return output, sum_w
+      ops.kernel_lookup_forward(data, kernel_idx, weights, output)
+    ctx.save_for_backward(data, kernel_idx, weights)
+    return output
 
-  @staticmethod
-  def backward(ctx, d_output, d_sum_w):
-    data, weights, sum_w = ctx.saved_tensors
-    d_data = data.new()
-    d_weights = weights.new()
-    d_data.resize_as_(data)
-    d_weights.resize_as_(weights)
-    if _is_cuda(d_output, d_sum_w):
-      ops.kernel_weighting_backward_cuda(
-        data, weights, sum_w, d_output, d_sum_w, d_data, d_weights)
-    else:
-      ops.kernel_weighting_backward(
-        data, weights, sum_w, d_output, d_sum_w, d_data, d_weights)
-    return d_data, d_weights
+  # @staticmethod
+  # def backward(ctx, d_output, d_sum_w):
+  #   data, weights, sum_w = ctx.saved_tensors
+  #   d_data = data.new()
+  #   d_weights = weights.new()
+  #   d_data.resize_as_(data)
+  #   d_weights.resize_as_(weights)
+  #   if _is_cuda(d_output, d_sum_w):
+  #     ops.kernel_weighting_backward_cuda(
+  #       data, weights, sum_w, d_output, d_sum_w, d_data, d_weights)
+  #   else:
+  #     ops.kernel_weighting_backward(
+  #       data, weights, sum_w, d_output, d_sum_w, d_data, d_weights)
+  #   return d_data, d_weights

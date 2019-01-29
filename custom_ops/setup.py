@@ -3,7 +3,7 @@ import platform
 import re
 from setuptools import setup, find_packages
 
-from torch.utils.cpp_extension import CppExtension, BuildExtension, CUDAExtension
+from torch.utils.cpp_extension import BuildExtension
 import torch as th
 
 def generate_pybind_wrapper(path, headers):
@@ -64,10 +64,12 @@ sources = [wrapper_path]
 
 
 if th.cuda.is_available():
+  from torch.utils.cpp_extension import CUDAExtension
   extension = CUDAExtension(ext_name, sources,
                             extra_objects=hl_libs,
                             extra_compile_args=compile_args)
 else:
+  from torch.utils.cpp_extension import CppExtension
   extension = CppExtension(ext_name, sources,
                            extra_objects=hl_libs,
                            extra_compile_args=compile_args)

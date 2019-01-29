@@ -51,17 +51,20 @@ EXT_DIR = dist
 
 # The makefile assumes that each op that has a backward also has a forward
 OPS = scatter2gather_forward \
-			kernel_weighting_forward \
-			kernel_weighting_backward
+	  kernel_weighting_forward \
+	  kernel_weighting_backward \
+	  kernel_lookup_forward
 
 OPS_LIBS = $(addsuffix .a, $(addprefix $(BUILD_DIR)/, $(OPS)))
 
 # Check we have cuda
 ifeq ($(shell which nvcc),)
+HAS_CUDA=0
 CUDA_OPS_LIBS = 
 CUDA_SRC =
 CUDA_OBJ =
 else
+HAS_CUDA=1
 CUDA_OPS_LIBS = $(addsuffix _cuda.a, $(addprefix $(BUILD_DIR)/, $(OPS)))
 # CUDA_SRC = bilateral_slice
 # CUDA_OBJ = $(addsuffix _cuda.so, $(addprefix $(BUILD_DIR)/, $(CUDA_SRC)))
