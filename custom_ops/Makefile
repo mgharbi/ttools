@@ -53,7 +53,8 @@ EXT_DIR = dist
 OPS = scatter2gather_forward \
 	  kernel_weighting_forward \
 	  kernel_weighting_backward \
-	  kernel_lookup_forward
+	  kernel_lookup_forward \
+	  kernel_lookup_backward
 
 OPS_LIBS = $(addsuffix .a, $(addprefix $(BUILD_DIR)/, $(OPS)))
 

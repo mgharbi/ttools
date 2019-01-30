@@ -11,6 +11,7 @@ public:
     Input<Buffer<float>> weights{"weights", 4};
     Output<Buffer<float>> output{"output", 4};
 
+
     void generate() {
         std::map<std::string, Func> funcs = kernel_lookup(
             data, kernel_idx, weights, output);
@@ -18,7 +19,6 @@ public:
         Var tx("tx"), ty("ty"), tz("tz"),
             xy("xy"), cn("cn"), allvars("allvars");
         int ts = 16;
-
 
         if(get_target().has_gpu_feature()) {
             output
@@ -36,7 +36,6 @@ public:
                 ;
         } else {
             output
-                .compute_root()
                 .fuse(c, n, cn)
                 .fuse(y, cn, allvars)
                 .parallel(allvars, 8)

@@ -147,7 +147,7 @@ class TestScatter2Gather(unittest.TestCase):
 class TestKernelLookup(unittest.TestCase):
   def setUp(self):
     bs = 4
-    ci = 1
+    ci = 3
     co = 3
     h = 16
     w = 16
@@ -162,16 +162,38 @@ class TestKernelLookup(unittest.TestCase):
       self.data = self.data.cuda()
       self.kernel_idx = self.kernel_idx.cuda()
       self.weights = self.weights.cuda()
-  #
-  # def test_kernel_lookup(self):
-  #   for i in range(5):
-  #     o = funcs.KernelLookup.apply(self.data, self.kernel_idx, self.weights)
-  #
-  #   with profiler.profile(use_cuda=th.cuda.is_available()) as prof:
-  #     for i in range(1):
-  #       o = funcs.KernelLookup.apply(self.data, self.kernel_idx, self.weights)
-  #   print(prof)
-  #   print(o.mean().item())
+
+  def test_gradient(self):
+    self.data.requires_grad = True
+    gradcheck(
+        funcs.KernelLookup.apply,
+        (self.data, self.kernel_idx, self.weights),
+        eps=1e-4, atol=5e-2, rtol=5e-4,
+         )
+
+  def test_weights_gradient(self):
+    self.weights.requires_grad = True
+    gradcheck(
+        funcs.KernelLookup.apply,
+        (self.data, self.kernel_idx, self.weights),
+        eps=1e-4, atol=5e-2, rtol=5e-4,
+         )
+
+  def test_profile(self):
+    self.data.requires_grad = True
+    self.weights.requires_grad = True
+
+    for i in range(5):
+      o = funcs.KernelLookup.apply(self.data, self.kernel_idx, self.weights)
+      loss = o.sum()
+      loss.backward()
+
+    with profiler.profile(use_cuda=th.cuda.is_available()) as prof:
+      for i in range(5):
+        o = funcs.KernelLookup.apply(self.data, self.kernel_idx, self.weights)
+        loss = o.sum()
+        loss.backward()
+    print(prof)
 
   def test_choose_right_kernel(self):
     # Each output channel uses a different kernel
