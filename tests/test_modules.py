@@ -4,6 +4,7 @@ import torch as th
 import torch.nn as nn
 
 from ..modules import networks
+from ..modules import ops
 
 
 class TestConvModule(unittest.TestCase):
@@ -278,6 +279,7 @@ class TestFCChain(unittest.TestCase):
         self.assertEqual(fc.fc2.dropout.p, 0.05)
         self.assertEqual(len(list(fc.children())), 3)
 
+
 class TestUnet(unittest.TestCase):
     def setUp(self):
         self.bs = 1
@@ -291,8 +293,29 @@ class TestUnet(unittest.TestCase):
         unet = networks.UNet(self.c, self.c_out)
         print(unet)
         out = unet(self.in_data)
-    
 
+
+class TestKernelLookup(unittest.TestCase):
+    def setUp(self):
+        self.bs = 1
+        self.c = 3
+        self.c_out = 4
+        self.h = 128
+        self.w = 128
+        self.in_data = th.ones(self.bs, self.c, self.h, self.w)
+        self.kidx = th.ones(self.bs, self.c_out, self.h, self.w).int()
+
+    def test_default(self):
+        lk = ops.KernelLookup(self.c, 3, 64)
+        print(lk)
+        self.in_data.requires_grad=True
+        self.in_data = self.in_data.cuda()
+        self.kidx = self.kidx.cuda()
+        lk.cuda()
+        out = lk(self.in_data, self.kidx)
+        loss = out.mean()
+        loss.backward()
+        print(lk.weights.grad.max())
 
 # class TestDownConvChain(unittest.TestCase):
 #     def setUp(self):
