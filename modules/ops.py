@@ -41,6 +41,6 @@ class KernelLookup(nn.Module):
     def forward(self, data, kernel_idx):
         n, c, h, w = self.weights.shape
         weights = self.weights
-        weights = weights.view(n, c, h*w)
-        weights = th.nn.functional.softmax(weights, dim=-1).view(n, c, h, w)
+        # weights = weights.view(n, c, h*w)
+        # weights = th.nn.functional.softmax(weights, dim=-1).view(n, c, h, w)
         return F.KernelLookup.apply(data, kernel_idx, weights)
