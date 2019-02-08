@@ -20,12 +20,7 @@ class KernelLookup(nn.Module):
         std = 1.0 / math.sqrt(self.ksize*self.ksize*self.c_in)
         th.nn.init.normal_(self.weights, std=std)
 
-        # self.weights.data[..., 1, 1] = 1.0
-        # th.nn.init.uniform_(self.weights, 0, 2)
-
-        # self.weights.data.fill_(0.0)
-        # self.weights.data.fill_(0.5)
-        # self.weights.data[:, :, (self.ksize-1)//2, (self.ksize-1)//2] = 1.0
+        # th.nn.init.uniform_(self.weights, 0, 1)
 
         # nrm = self.weights.detach().abs().sum(-1, keepdim=True).sum(-2, keepdim=True)
         # self.weights.data /= nrm
@@ -40,6 +35,6 @@ class KernelLookup(nn.Module):
         weights = self.weights
         # nrm = self.weights.detach().abs().sum(-1, keepdim=True).sum(-2, keepdim=True)
         # weights = weights / (nrm+1e-8)
-        # weights = weights.view(n, c, h*w)
-        # weights = th.nn.functional.softmax(weights, dim=-1).view(n, c, h, w)
+        weights = weights.view(n, c, h*w)
+        weights = th.nn.functional.softmax(weights, dim=-1).view(n, c, h, w)
         return F.KernelLookup.apply(data, kernel_idx, weights)
