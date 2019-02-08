@@ -288,7 +288,7 @@ class Checkpointer(object):
 
     EXTENSION = ".pth"
 
-    def __init__(self, root, model=None, meta=None, prefix=None):
+    def __init__(self, root, model=None, meta=None):
         self.root = root
         self.model = model
         self.meta = meta

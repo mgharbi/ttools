@@ -10,7 +10,7 @@ class PSNR(th.nn.Module):
         self.mse = th.nn.MSELoss()
     def forward(self, out, ref):
         mse = self.mse(out, ref)
-        return -10*th.log10(mse)
+        return -10*th.log10(mse+1e-12)
 
 
 class PerceptualLoss(th.nn.Module):
