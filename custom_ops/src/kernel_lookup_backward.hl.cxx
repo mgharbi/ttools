@@ -2,6 +2,8 @@
 
 #include "gradient_helpers.h"
 
+using namespace Halide;
+
 namespace gradient_apps {
 
 class KernelLookupBackwardGenerator : public Generator<KernelLookupBackwardGenerator> {
@@ -22,6 +24,12 @@ public:
             xy("xy"), cn("cn"), allvars("allvars");
         int ts = 16;
 
+        Expr kw = weights.dim(0).extent();
+        Expr kh = weights.dim(1).extent();
+        Expr channels = weights.dim(2).extent();
+        Expr nkernels = weights.dim(3).extent();
+        Expr small_elt_count = kw*kh*channels*nkernels < 16;
+
         if(get_target().has_gpu_feature()) {
             d_data
                 .fuse(x, y, xy)
@@ -39,15 +47,18 @@ public:
             d_weights
                 .fuse(xk, yk, xy)
                 .fuse(c, k, cn)
-                .fuse(xy, cn, allvars)
-                .gpu_tile(allvars, tx, 64)
                 ;
             d_weights
                 .update()
                 .fuse(xk, yk, xy)
                 .fuse(c, k, cn)
-                .fuse(xy, cn, allvars)
-                .gpu_tile(allvars, tx, 64)
+                ;
+            d_weights
+                .gpu_tile(cn, tx, 4)
+                ;
+            d_weights
+                .update()
+                .gpu_tile(cn, tx, 4)
                 ;
         } else {
             d_data
@@ -64,8 +75,8 @@ public:
                 .vectorize(x, 8)
                 ;
         }
-        d_data.print_loop_nest();
-        d_weights.print_loop_nest();
+        // d_data.print_loop_nest();
+        // d_weights.print_loop_nest();
     }
 };
 

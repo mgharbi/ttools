@@ -152,11 +152,13 @@ class TestKernelLookup(unittest.TestCase):
     h = 16
     w = 16
     self.ksize = 5
-    self.nkernels = 64
+    self.nkernels = 4
 
-    self.data = th.zeros(bs, ci, h, w, requires_grad=False)
-    self.kernel_idx = th.ones(bs, co, h, w, requires_grad=False).int()
-    self.weights = th.ones(self.nkernels, ci, self.ksize, self.ksize, requires_grad=False)
+    self.data = th.rand(bs, ci, h, w, requires_grad=False)
+    self.kernel_idx = th.rand(bs, co, h, w, requires_grad=False).int()
+    self.weights = th.randn(self.nkernels, ci, self.ksize, self.ksize, requires_grad=False)
+    # self.kernel_idx = th.ones(bs, co, h, w, requires_grad=False).int()
+    # self.weights = th.ones(self.nkernels, ci, self.ksize, self.ksize, requires_grad=False)
 
     if th.cuda.is_available():
       self.data = self.data.cuda()
@@ -170,6 +172,7 @@ class TestKernelLookup(unittest.TestCase):
         (self.data, self.kernel_idx, self.weights),
         eps=1e-4, atol=5e-2, rtol=5e-4,
          )
+    print("tested gradients")
 
   def test_weights_gradient(self):
     self.weights.requires_grad = True
@@ -179,21 +182,21 @@ class TestKernelLookup(unittest.TestCase):
         eps=1e-4, atol=5e-2, rtol=5e-4,
          )
 
-  def test_profile(self):
-    self.data.requires_grad = True
-    self.weights.requires_grad = True
-
-    for i in range(5):
-      o = funcs.KernelLookup.apply(self.data, self.kernel_idx, self.weights)
-      loss = o.sum()
-      loss.backward()
-
-    with profiler.profile(use_cuda=th.cuda.is_available()) as prof:
-      for i in range(5):
-        o = funcs.KernelLookup.apply(self.data, self.kernel_idx, self.weights)
-        loss = o.sum()
-        loss.backward()
-    print(prof)
+  # def test_profile(self):
+  #   self.data.requires_grad = True
+  #   self.weights.requires_grad = True
+  #
+  #   for i in range(5):
+  #     o = funcs.KernelLookup.apply(self.data, self.kernel_idx, self.weights)
+  #     loss = o.sum()
+  #     loss.backward()
+  #
+  #   with profiler.profile(use_cuda=th.cuda.is_available()) as prof:
+  #     for i in range(5):
+  #       o = funcs.KernelLookup.apply(self.data, self.kernel_idx, self.weights)
+  #       loss = o.sum()
+  #       loss.backward()
+  #   print(prof)
 
   def test_choose_right_kernel(self):
     # Each output channel uses a different kernel
@@ -207,6 +210,9 @@ class TestKernelLookup(unittest.TestCase):
     self.weights[2, 0, 2, 1] = 1  # pixel to the left
     self.weights[3, 0, 1, 2] = 1  # pixel above
 
+    # self.weights[4, 0, 2, 3] = 1  # right
+    # self.weights[5, 0, 3, 2] = 1  # bottom
+
     # A single dirac in the input data
     self.data.fill_(0.0)
     self.data[0, :, 5, 3] = 1.0
@@ -216,6 +222,8 @@ class TestKernelLookup(unittest.TestCase):
 
     # Check the kernel assignments are correct
     self.assertLess((o[0, 0] - self.data[0, 0]).abs().sum(), 1e-8)
+    self.assertAlmostEqual(o[0, 1, 5, 4].item(), 1.0)
+    self.assertAlmostEqual(o[0, 2, 6, 3].item(), 1.0)
     self.assertAlmostEqual(o[0, 1, 5, 4].item(), 1.0)
     self.assertAlmostEqual(o[0, 2, 6, 3].item(), 1.0)
 

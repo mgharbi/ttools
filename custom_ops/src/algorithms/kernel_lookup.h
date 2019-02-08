@@ -23,14 +23,13 @@ std::map<std::string, Func> kernel_lookup(
     f_data = Halide::BoundaryConditions::constant_exterior(data, 0.0f);
     Func f_kidx("f_kidx");
     f_kidx = Halide::BoundaryConditions::constant_exterior(kernel_idx, 0);
-    Func f_weights("f_weights");
-    f_weights = Halide::BoundaryConditions::constant_exterior(weights, 0.0f);
 
     Expr kw = weights.dim(0).extent();
     Expr kh = weights.dim(1).extent();
-    Expr channels = data.dim(2).extent();
+    Expr channels = weights.dim(2).extent();  // in the input
 
     // Reduction over the kernel's extent.
+    // RDom r_kernel(0, kw, 0, kh, 0, channels);
     RDom r_kernel(-(kw-1)/2, kw, -(kh-1)/2, kh, 0, channels);
     Expr dx = r_kernel.x;
     Expr dy = r_kernel.y;
@@ -40,7 +39,8 @@ std::map<std::string, Func> kernel_lookup(
     Expr k_idx = clamp(f_kidx(x, y, c, n), weights.dim(3).min(), weights.dim(3).max());
 
     // Kernel weight corresponding to the reduction multi-index.
-    Expr w = f_weights(dx + (kw-1)/2, dy + (kh-1)/2, dc, k_idx);
+    // Expr w = weights(dx, dy, dc, k_idx);
+    Expr w = weights(dx + (kw-1)/2, dy + (kh-1)/2, dc, k_idx);
     
     // Sum input values in the neighborhood of (x, y) using the appropriate kernel
     output(x, y, c, n) = 0.0f;
@@ -67,14 +67,12 @@ std::map<std::string, Func> kernel_lookup_backward(
     f_data = Halide::BoundaryConditions::constant_exterior(data, 0.0f);
     Func f_kidx("f_kidx");
     f_kidx = Halide::BoundaryConditions::constant_exterior(kernel_idx, 0);
-    Func f_weights("f_weights");
-    f_weights = Halide::BoundaryConditions::constant_exterior(weights, 0.0f);
     Func f_d_output("f_d_output");
     f_d_output = Halide::BoundaryConditions::constant_exterior(d_output, 0.0f);
 
     Expr kw = weights.dim(0).extent();
     Expr kh = weights.dim(1).extent();
-    Expr channels = data.dim(2).extent();
+    Expr channels = data.dim(2).extent();  // in the input
 
     // Reduction over the kernel's extent.
     RDom r_kernel(-(kw-1)/2, kw, -(kh-1)/2, kh, 0, channels);
@@ -86,7 +84,7 @@ std::map<std::string, Func> kernel_lookup_backward(
     Expr k_idx = clamp(f_kidx(x-dx, y-dy, dc, n), weights.dim(3).min(), weights.dim(3).max());
 
     // Kernel weight corresponding to the reduction multi-index.
-    Expr w = f_weights(dx + (kw-1)/2, dy + (kh-1)/2, c, k_idx);
+    Expr w = weights(dx + (kw-1)/2, dy + (kh-1)/2, c, k_idx);
     
     // Sum gradients in the neighborhood of (x, y) using the appropriate kernel
     d_data(x, y, c, n) = 0.0f;
@@ -95,7 +93,7 @@ std::map<std::string, Func> kernel_lookup_backward(
     // Reduction over the entire image to backprop to weights
     Expr width = d_output.dim(0).extent();
     Expr height = d_output.dim(1).extent();
-    Expr o_channels = d_output.dim(2).extent();
+    Expr o_channels = d_output.dim(2).extent();  // in output
     Expr batch = d_output.dim(3).extent();
     RDom r_dkernel(0, width, 0, height, 0, o_channels, 0, batch);
     Expr rx = r_dkernel.x;
@@ -108,9 +106,7 @@ std::map<std::string, Func> kernel_lookup_backward(
 
     d_weights(xk, yk, c, k) = 0.0f;
     d_weights(xk, yk, c, k) += 
-        f_d_output(rx, ry, rc, rn)*f_data(rx + xk, ry + yk, c, rn)*kernel_matches;
-
-    // d_data(x, y, c, n) += w * f_d_output(x - dx, y - dy, dc, n);
+        f_d_output(rx, ry, rc, rn)*f_data(rx + xk - (kw-1)/2, ry + yk - (kh-1)/2, c, rn)*kernel_matches;
 
     std::map<std::string, Func> func_map;
     return func_map;
