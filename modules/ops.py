@@ -13,6 +13,8 @@ class KernelLookup(nn.Module):
         self.ksize = ksize
         self.nkernels = nkernels
         self.weights = nn.Parameter(th.ones(nkernels, c_in, ksize, ksize))
+        self.biases = nn.Parameter(th.ones(nkernels, c_in, 1, 1))
+        # self.weights_n = nn.Parameter(th.ones(nkernels, c_in, ksize, ksize))
 
         self.init_weights()
 
@@ -20,7 +22,10 @@ class KernelLookup(nn.Module):
         std = 1.0 / math.sqrt(self.ksize*self.ksize*self.c_in)
         th.nn.init.normal_(self.weights, std=std)
 
+        # th.nn.init.normal_(self.weights_n, std=std)
+
         # th.nn.init.uniform_(self.weights, 0, 1)
+        th.nn.init.constant_(self.biases, 0)
 
         # nrm = self.weights.detach().abs().sum(-1, keepdim=True).sum(-2, keepdim=True)
         # self.weights.data /= nrm
@@ -33,8 +38,14 @@ class KernelLookup(nn.Module):
     def forward(self, data, kernel_idx):
         n, c, h, w = self.weights.shape
         weights = self.weights
-        # nrm = self.weights.detach().abs().sum(-1, keepdim=True).sum(-2, keepdim=True)
-        # weights = weights / (nrm+1e-8)
+        # weights = th.nn.functional.tanh(weights)
         weights = weights.view(n, c, h*w)
         weights = th.nn.functional.softmax(weights, dim=-1).view(n, c, h, w)
-        return F.KernelLookup.apply(data, kernel_idx, weights)
+        weights = weights + self.biases
+        pos = F.KernelLookup.apply(data, kernel_idx, weights)
+
+        # weights_n = self.weights_n
+        # weights_n = weights_n.view(n, c, h*w)
+        # weights_n = th.nn.functional.softmax(weights_n, dim=-1).view(n, c, h, w)
+        # neg = F.KernelLookup.apply(data, kernel_idx, weights_n)
+        return pos

@@ -1,4 +1,4 @@
-all: test
+all: custom_ops
 
 test: custom_ops
 	py.test tests
