@@ -157,13 +157,36 @@ class TestKernelLookup(unittest.TestCase):
     self.data = th.rand(bs, ci, h, w, requires_grad=False)
     self.kernel_idx = th.rand(bs, co, h, w, requires_grad=False).int()
     self.weights = th.randn(self.nkernels, ci, self.ksize, self.ksize, requires_grad=False)
-    # self.kernel_idx = th.ones(bs, co, h, w, requires_grad=False).int()
-    # self.weights = th.ones(self.nkernels, ci, self.ksize, self.ksize, requires_grad=False)
 
     if th.cuda.is_available():
       self.data = self.data.cuda()
       self.kernel_idx = self.kernel_idx.cuda()
       self.weights = self.weights.cuda()
+
+  def test_sum(self):
+    bs = 4
+    ci = 3
+    co = 3
+    h = 16
+    w = 16
+    self.ksize = 5
+    self.nkernels = 4
+
+    self.data[:, 0] = 1.0
+    self.data[:, 1] = 2.0
+    self.data[:, 2] = 3.0
+    self.kernel_idx[...] = 0
+    self.weights.data.fill_(0.0)
+    self.weights.data[0, 0, 2, 2] = 1.0
+
+    o = funcs.KernelLookup.apply(self.data, self.kernel_idx, self.weights)
+
+    self.weights.data[0, 1, 2, 2] = 1.0
+    o = funcs.KernelLookup.apply(self.data, self.kernel_idx, self.weights)
+    
+    self.weights.data[0, 2, 2, 2] = 1.0
+    o = funcs.KernelLookup.apply(self.data, self.kernel_idx, self.weights)
+    assert((o-6.0).abs().max() < 1e-12)
 
   def test_gradient(self):
     self.data.requires_grad = True
@@ -181,22 +204,6 @@ class TestKernelLookup(unittest.TestCase):
         (self.data, self.kernel_idx, self.weights),
         eps=1e-4, atol=5e-2, rtol=5e-4,
          )
-
-  # def test_profile(self):
-  #   self.data.requires_grad = True
-  #   self.weights.requires_grad = True
-  #
-  #   for i in range(5):
-  #     o = funcs.KernelLookup.apply(self.data, self.kernel_idx, self.weights)
-  #     loss = o.sum()
-  #     loss.backward()
-  #
-  #   with profiler.profile(use_cuda=th.cuda.is_available()) as prof:
-  #     for i in range(5):
-  #       o = funcs.KernelLookup.apply(self.data, self.kernel_idx, self.weights)
-  #       loss = o.sum()
-  #       loss.backward()
-  #   print(prof)
 
   def test_choose_right_kernel(self):
     # Each output channel uses a different kernel
@@ -226,4 +233,3 @@ class TestKernelLookup(unittest.TestCase):
     self.assertAlmostEqual(o[0, 2, 6, 3].item(), 1.0)
     self.assertAlmostEqual(o[0, 1, 5, 4].item(), 1.0)
     self.assertAlmostEqual(o[0, 2, 6, 3].item(), 1.0)
-
