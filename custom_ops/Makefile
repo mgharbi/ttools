@@ -106,7 +106,7 @@ $(BUILD_DIR)/%_cuda.a: $(BUILD_DIR)/%
 GENERATORS = $(addprefix $(BUILD_DIR)/, $(OPS))
 .SECONDARY: $(GENERATORS)
 
-$(BUILD_DIR)/%: $(SRC_DIR)/%.hl.cxx $(HALIDE_GEN) gradient-halide
+$(BUILD_DIR)/%: $(SRC_DIR)/%.hl.cxx $(HALIDE_GEN) gradient-halide/lib/libHalide.a
 	@echo Building Generator $(subst $(BUILD_DIR)/,, $@)
 	@mkdir -p $(BUILD_DIR)
 	@$(CXX) $(HALIDE_GEN) $< $(CXXFLAGS) $(INCLUDE) $(LDFLAGS) -MMD -MP -o $(basename $@)
@@ -123,9 +123,9 @@ submodules:
 	@git submodule init
 	@git submodule update --recursive
 
-gradient-halide: #submodules
+gradient-halide/lib/libHalide.a: submodules
 	@echo "Building gradient halide"
-	@$(MAKE) -j distrib -C $@
+	@$(MAKE) -j distrib -C gradient-halide
 
 .PHONY: submodules
 
