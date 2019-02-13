@@ -32,17 +32,13 @@ public:
 
         if(get_target().has_gpu_feature()) {
             d_data
-                .fuse(x, y, xy)
                 .fuse(c, n, cn)
-                .fuse(xy, cn, allvars)
-                .gpu_tile(allvars, tx, 1024)
+                .gpu_tile(x, y, cn, tx, ty, tz, 32, 32, 1, Halide::TailStrategy::GuardWithIf)
                 ;
             d_data
                 .update()
-                .fuse(x, y, xy)
                 .fuse(c, n, cn)
-                .fuse(xy, cn, allvars)
-                .gpu_tile(allvars, tx, 1024)
+                .gpu_tile(x, y, cn, tx, ty, tz, 32, 32, 1, Halide::TailStrategy::GuardWithIf)
                 ;
             d_weights
                 .fuse(xk, yk, xy)

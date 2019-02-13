@@ -21,8 +21,6 @@ std::map<std::string, Func> kernel_lookup(
 {
     Func f_data("f_data");
     f_data = Halide::BoundaryConditions::constant_exterior(data, 0.0f);
-    Func f_kidx("f_kidx");
-    f_kidx = Halide::BoundaryConditions::constant_exterior(kernel_idx, 0);
 
     Expr kw = weights.dim(0).extent();
     Expr kh = weights.dim(1).extent();
@@ -36,7 +34,7 @@ std::map<std::string, Func> kernel_lookup(
     Expr dc = r_kernel.z;
 
     // Kernel index to read.
-    Expr k_idx = clamp(f_kidx(x, y, c, n), weights.dim(3).min(), weights.dim(3).max());
+    Expr k_idx = clamp(kernel_idx(x, y, c, n), weights.dim(3).min(), weights.dim(3).max());
 
     // Kernel weight corresponding to the reduction multi-index.
     // Expr w = weights(dx, dy, dc, k_idx);

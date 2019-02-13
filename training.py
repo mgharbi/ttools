@@ -288,18 +288,24 @@ class Checkpointer(object):
 
     EXTENSION = ".pth"
 
-    def __init__(self, root, model=None, meta=None):
+    def __init__(self, root, model=None, meta=None, prefix=None):
         self.root = root
         self.model = model
         self.meta = meta
 
         LOG.debug(self)
 
+        self.prefix = ""
+        if prefix is not None:
+            self.prefix = prefix
+
     def __repr__(self):
         return "Checkpointer with root at \"{}\"".format(self.root)
 
-    def __path(self, path):
-        return os.path.join(self.root, os.path.splitext(path)[0] + ".pth")
+    def __path(self, path, prefix=None):
+        if prefix is None:
+            prefix = ""
+        return os.path.join(self.root, prefix+os.path.splitext(path)[0] + ".pth")
 
     def save(self, path, extras=None):
         """Save model, metaparams and extras to relative path.
@@ -315,7 +321,7 @@ class Checkpointer(object):
             LOG.debug("Saving model state dict")
             model_state = self.model.state_dict()
 
-        filename = self.__path(path)
+        filename = self.__path(path, prefix=self.prefix)
         os.makedirs(self.root, exist_ok=True)
         th.save({'model': model_state,
                  'meta': self.meta,
@@ -352,7 +358,7 @@ class Checkpointer(object):
           meta (dict): metaparameters of the model passed at save time.
         """
 
-        filename = self.__path(path)
+        filename = self.__path(path, prefix=None)
         chkpt = th.load(filename)
 
         if self.model is not None and chkpt["model"] is not None:
@@ -385,7 +391,7 @@ class Checkpointer(object):
 
     def sorted_checkpoints(self):
         """Get list of all checkpoints in root directory, sorted by creation date."""
-        reg = re.compile(r".*\{}".format(Checkpointer.EXTENSION))
+        reg = re.compile(r"{}.*\{}".format(self.prefix, Checkpointer.EXTENSION))
         if not os.path.exists(self.root):
             all_checkpoints = []
         else:

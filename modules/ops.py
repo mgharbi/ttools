@@ -40,7 +40,7 @@ class KernelLookup(nn.Module):
         weights = self.weights
         # weights = weights.view(n, c, h*w)
         # weights = th.nn.functional.softmax(weights, dim=-1).view(n, c, h, w)
-        weights = weights + self.biases
+        # weights = weights + self.biases
         pos = F.KernelLookup.apply(data, kernel_idx, weights)
 
         return pos
