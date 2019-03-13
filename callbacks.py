@@ -1,4 +1,4 @@
-"""Callbacks that can be added to a model trainer's maiin loop."""
+"""Callbacks that can be added to a model trainer's main loop."""
 
 # TODO: implement experiment logger
 # TODO: implement csv logger

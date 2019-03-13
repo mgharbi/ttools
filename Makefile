@@ -10,4 +10,7 @@ custom_ops:
 	$(MAKE) -C $@ submodules
 	$(MAKE) -C $@
 
+clean:
+	$(MAKE) -C custom_ops clean 
+
 .PHONY: custom_ops
