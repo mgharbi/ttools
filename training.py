@@ -359,7 +359,7 @@ class Checkpointer(object):
         """
 
         filename = self.__path(path, prefix=None)
-        chkpt = th.load(filename)
+        chkpt = th.load(filename, map_location="cpu")  # TODO: check behavior
 
         if self.model is not None and chkpt["model"] is not None:
             LOG.debug("Loading model state dict")
