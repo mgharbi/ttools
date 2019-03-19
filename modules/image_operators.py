@@ -23,6 +23,42 @@ def crop_like(src, tgt):
     else:
         return src
 
+class RGB2YCbCr(th.nn.Module):
+    def __init__(self):
+        super(RGB2YCbCr, self).__init__()
+
+        # ACR numbers
+        kr = 0.299
+        kg = 0.587
+        kb = 0.114
+
+        kInvSum = 1.0 / (kr + kg + kb)
+
+        kr *= kInvSum
+        kg *= kInvSum
+        kb *= kInvSum
+
+        krScale = 0.5 / (kr - 1.0)
+        kbScale = 0.5 / (kb - 1.0)
+
+        rgb2ycc = th.Tensor(3, 3)
+        rgb2ycc[0, 0] = kr
+        rgb2ycc[0, 1] = kg
+        rgb2ycc[0, 2] = kb
+
+        rgb2ycc[1, 0] = (kr - 1.0) * krScale
+        rgb2ycc[1, 1] = (kg	  ) * krScale
+        rgb2ycc[1, 2] = (kb	  ) * krScale
+
+        rgb2ycc[2, 0] = (kr	  ) * kbScale
+        rgb2ycc[2, 1] = (kg	  ) * kbScale
+        rgb2ycc[2, 2] = (kb - 1.0) * kbScale
+
+        self.register_buffer("rgb2ycc", rgb2ycc)
+
+    def forward(self, x):
+        y = th.tensordot(x, self.rgb2ycc, ([-3,], [1,])).permute(0, 3, 1, 2)
+        return y
 
 # class MedianFilter(nn.Module):
 #   def __init__(self, ksize=3):
