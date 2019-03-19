@@ -106,7 +106,7 @@ class ConvModule(nn.Module):
       n_in(int): number of input channels.
       n_out(int): number of output channels.
       ksize(int): size of the convolution kernel (square).
-      stride(int): 
+      stride(int): downsampling factor
       pad(bool): if True, zero pad the convolutions to maintain a constant size.
       activation(str): nonlinear activation function between convolutions.
       norm_layer(str): normalization to apply between the convolution modules.
@@ -211,6 +211,81 @@ class ConvChain(nn.Module):
             x = m(x)
         return x
 
+
+class ResidualBlock(nn.Module):
+    """Basic residual block with activation(optional) + conv.
+
+    Args:
+      n_features(int): number of input/output channels.
+      activation(str): nonlinear activation function between convolutions.
+    """
+
+    def __init__(self, n_features, ksize=3, n_convs=2, activation=None):
+        super(ResidualBlock, self).__init__()
+
+        assert isinstance(n_features, int) and n_features > 0, \
+            "Channels should be a positive integer got {}".format(n_features)
+        assert isinstance(
+            ksize, int) and ksize > 0, "Kernel size should be a positive integer got {}".format(ksize)
+        assert isinstance(
+            n_convs, int) and n_convs > 0, "Number of convolutions should be positive"
+
+        padding = (ksize - 1) // 2
+
+        for idx in range(n_convs):
+            if activation is not None:
+                self.add_module("activation{}".format(idx), _get_activation(activation))
+            convname = "conv{}".format(idx)
+            self.add_module(convname, nn.Conv2d(n_features, n_features, ksize, 
+                                              stride=1, padding=padding, 
+                                              bias=True))
+
+            _init_fc_or_conv(getattr(self, convname), activation)
+
+    def forward(self, x):
+        straight = x  # unprocessed path
+        x = x.clone()
+        for c in self.children():
+            x = c(x)
+        x = x + straight  # residual connection
+        return x
+
+
+class ResidualChain(nn.Module):
+    """Linear chain of residual blocks.
+
+    Args:
+      n_features(int): number of input channels.
+      ksize(int): size of the convolution kernel (square).
+      depth(int): number of residual blocks
+      convs_per_block(int): number of convolution per residual block
+      activation(str): nonlinear activation function between convolutions.
+    """
+
+    def __init__(self, n_features, ksize=3, depth=3, convs_per_block=2,
+                 activation="relu"):
+        super(ResidualChain, self).__init__()
+
+        assert isinstance(
+            n_features, int) and n_features > 0, "Number of feature channels should be a positive integer"
+        assert (isinstance(ksize, int) and ksize > 0) or isinstance(
+            ksize, list), "Kernel size should be a positive integer or a list of integers"
+        assert isinstance(
+            depth, int) and depth > 0, "Depth should be a positive integer"
+
+        # Core processing layers
+        for lvl in range(depth):
+            self.add_module(
+                "resblock{}".format(lvl),
+                ResidualBlock(n_features, ksize=ksize, 
+                              n_convs=convs_per_block, activation=activation))
+
+    def forward(self, x):
+        for m in self.children():
+            x = m(x)
+        return x
+
+
 class UNet(nn.Module):
     """Simple UNet with downsampling and concat operations.
 
@@ -290,56 +365,7 @@ class UNet(nn.Module):
 
 
 
-# class DownConvChain(ConvChain):
-#     """Chain of convolution layers with 2x spatial downsamplings.
-#
-#     Args:
-#       n_in(int): number of input channels.
-#       n_out(int): number of output channels.
-#       ksize(int): size of the convolution kernel (square).
-#       base_width(int): number of features channels in the intermediate layers.
-#       increase_factor(float): multiplicative factor on feature size after downsampling.
-#       num_levels(int): number of downsampling levels.
-#       convs_per_level(int or list of ints): number of conv layers at each levels.
-#       pad(bool): if True, zero pad the convolutions to maintain a constant size.
-#       activation(str): nonlinear activation function between convolutions.
-#       norm_layer(str): normalization to apply between the convolution modules.
-#     """
-#
-#     def __init__(self, n_in, n_out, ksize=3, base_width=64, increase_factor=2.0,
-#                  num_levels=3, convs_per_level=2, pad=True,
-#                  activation="relu", norm_layer=None):
-#
-#         assert isinstance(
-#             num_levels, int) and num_levels > 0, "num_levels should be a positive integer"
-#         assert isinstance(convs_per_level, int) or isinstance(
-#             convs_per_level, list), "convs_per_level should be a positive integer or list of ints"
-#         assert isinstance(
-#             increase_factor, float) and increase_factor >= 1.0, "increase_factor should be a float >= 1.0"
-#
-#         if (increase_factor, int):
-#             increase_factor = [increase_factor]*num_levels
-#         assert len(
-#             increase_factor) == num_levels, "increase_factor should have num_levels entries"
-#
-#         depth = num_levels*convs_per_level
-#         widths = []
-#         strides = []
-#         w = base_width
-#         for lvl in range(num_levels):
-#             for cv in range(convs_per_level):
-#                 if cv == convs_per_level-1:
-#                     strides.append(2)
-#                 else:
-#                     strides.append(1)
-#                 widths.append(w)
-#             w = int(w*increase_factor[lvl])
-#         # strides.append(1)
-#
-#         super(DownConvChain, self).__init__(
-#             n_in, n_out, ksize=ksize, depth=depth, strides=strides, pad=pad,
-#             width=widths, activation=activation, norm_layer=norm_layer)
-
+# Helpers ---------------------------------------------------------------------
 
 def _get_norm_layer(norm_layer, channels):
     valid = ["instance", "batch"]
@@ -371,3 +397,5 @@ def _init_fc_or_conv(fc_conv, activation):
     nn.init.xavier_uniform_(fc_conv.weight, gain)
     if fc_conv.bias is not None:
         nn.init.constant_(fc_conv.bias, 0.0)
+
+# -----------------------------------------------------------------------------

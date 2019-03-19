@@ -14,9 +14,9 @@ class PSNR(th.nn.Module):
 
 
 class PerceptualLoss(th.nn.Module):
-    def __init__(self):
+    def __init__(self, pretrained=True, n_in=3):
         super(PerceptualLoss, self).__init__()
-        self.feature_extractor = PerceptualLoss._FeatureExtractor()
+        self.feature_extractor = PerceptualLoss._FeatureExtractor(pretrained, n_in)
         self.mse = th.nn.MSELoss()
 
     def forward(self, out, ref):
@@ -37,8 +37,10 @@ class PerceptualLoss(th.nn.Module):
         return self.mse(self._normalize(a), self._normalize(b))*0.5
 
     class _FeatureExtractor(th.nn.Module):
-        def __init__(self):
+        def __init__(self, pretrained, n_in):
             super(PerceptualLoss._FeatureExtractor, self).__init__()
+            if pretrained:
+                assert n_in == 3, "pretrained VGG feature extractor expects 3-channel input"
             vgg_pretrained = models.vgg16(pretrained=True).features
             breakpoints = [0, 4, 9, 16, 23, 30]
             for i, b in enumerate(breakpoints[:-1]):
