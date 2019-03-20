@@ -39,14 +39,18 @@ class PerceptualLoss(th.nn.Module):
     class _FeatureExtractor(th.nn.Module):
         def __init__(self, pretrained, n_in):
             super(PerceptualLoss._FeatureExtractor, self).__init__()
+            self.pretrained = pretrained
             if pretrained:
                 assert n_in == 3, "pretrained VGG feature extractor expects 3-channel input"
-            vgg_pretrained = models.vgg16(pretrained=True).features
+            vgg_pretrained = models.vgg16(pretrained=pretrained).features
             breakpoints = [0, 4, 9, 16, 23, 30]
             for i, b in enumerate(breakpoints[:-1]):
                 ops = th.nn.Sequential()
                 for idx in range(b, breakpoints[i+1]):
-                    ops.add_module(str(idx), vgg_pretrained[idx])
+                    if idx == 0 and n_in != 3:
+                        ops.add_module(str(idx), th.nn.Conv2d(n_in, 64, 3, padding=1))
+                    else:
+                        ops.add_module(str(idx), vgg_pretrained[idx])
                 self.add_module("group{}".format(i), ops)
 
             for p in self.parameters():
@@ -57,7 +61,8 @@ class PerceptualLoss(th.nn.Module):
 
         def forward(self, x):
             feats = []
-            x = (x-self.shift) / self.scale
+            if self.pretrained:
+                x = (x-self.shift) / self.scale
             for m in self.children():
                 x = m(x)
                 feats.append(x)
