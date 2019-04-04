@@ -343,10 +343,11 @@ class Checkpointer(object):
                 if p2.shape != p.shape:
                     LOG.warning("Parameter {} ignored, checkpoint size does not match: {}, should be {}".format(n, p2.shape, p.shape))
                     continue
-                LOG.info("Parameter {} copied".format(n))
+                LOG.debug("Parameter {} copied".format(n))
                 p.data.copy_(p2)
             else:
                 LOG.warning("Parameter {} ignored, not found in source checkpoint.".format(n))
+        LOG.info("Weights loaded from foreign checkpoint {}".format(path))
 
     def load(self, path):
         """Loads a checkpoint, updates the model and returns extra data.
