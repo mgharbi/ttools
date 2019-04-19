@@ -17,7 +17,7 @@ NVFLAGS = -x cu -Xcompiler -fPIC -I$(SRC_DIR) \
 		  -gencode=arch=compute_30,code=\"sm_30,compute_30\" \
 		  -expt-relaxed-constexpr -Wno-deprecated-gpu-targets \
 		  -ftz=true --ptxas-options=-v -lineinfo
-CUDA_LDFLAGS= -L/usr/local/cuda/lib64 -lcuda -lcudart
+# CUDA_LDFLAGS= -L/usr/local/cuda/lib64 -lcuda -lcudart
 
 AUTO_SCHEDULE = false
 TARGET_FEATURES ?=
@@ -72,9 +72,11 @@ CUDA_OPS_LIBS = $(addsuffix _cuda.a, $(addprefix $(BUILD_DIR)/, $(OPS)))
 endif
 
 # Assemble all the custom operators in a single shared library to be loaded by Python
-_ext/operators/_operators.so: $(CUDA_OPS_LIBS) $(CUDA_OBJ) $(OPS_LIBS)
+_ext/operators/_operators.so:  all_ops
 	@echo Installing python module
 	@$(PYTHON) setup.py install #2>&1 > /dev/null
+
+all_ops: $(CUDA_OPS_LIBS) $(CUDA_OBJ) $(OPS_LIBS)
 
 # Rule for pure cuda kernels
 # $(BUILD_DIR)/%_cuda.so: $(SRC_DIR)/cuda_kernels/%.cu.cc $(SRC_DIR)/cuda_kernels/%.h $(BUILD_DIR)
