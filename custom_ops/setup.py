@@ -65,16 +65,16 @@ sources = [wrapper_path]
 # sources = hl_sources + [wrapper_path]
 
 
-if th.cuda.is_available():
-  from torch.utils.cpp_extension import CUDAExtension
-  extension = CUDAExtension(ext_name, sources,
-                            extra_objects=hl_libs,
-                            extra_compile_args=compile_args)
-else:
-  from torch.utils.cpp_extension import CppExtension
-  extension = CppExtension(ext_name, sources,
-                           extra_objects=hl_libs,
-                           extra_compile_args=compile_args)
+# if th.cuda.is_available():
+from torch.utils.cpp_extension import CUDAExtension
+extension = CUDAExtension(ext_name, sources,
+                          extra_objects=hl_libs,
+                          extra_compile_args=compile_args)
+# else:
+#   from torch.utils.cpp_extension import CppExtension
+#   extension = CppExtension(ext_name, sources,
+#                            extra_objects=hl_libs,
+#                            extra_compile_args=compile_args)
 
 # TODO: import all extensions in root lib
 
