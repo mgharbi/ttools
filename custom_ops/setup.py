@@ -59,7 +59,8 @@ for f in hl_srcs:
   # TODO: add cuda hl lib
 
 wrapper_path = os.path.join(build_dir, "pybind_wrapper.cpp")
-generate_pybind_wrapper(wrapper_path, hl_headers, th.cuda.is_available())
+generate_pybind_wrapper(wrapper_path, hl_headers, True)
+# generate_pybind_wrapper(wrapper_path, hl_headers, th.cuda.is_available())
 
 sources = [wrapper_path]
 # sources = hl_sources + [wrapper_path]

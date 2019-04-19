@@ -79,7 +79,7 @@ _ext/operators/_operators.so:  all_ops
 all_ops: $(CUDA_OPS_LIBS) $(CUDA_OBJ) $(OPS_LIBS)
 
 # Rule for pure cuda kernels
-# $(BUILD_DIR)/%_cuda.so: $(SRC_DIR)/cuda_kernels/%.cu.cc $(SRC_DIR)/cuda_kernels/%.h $(BUILD_DIR)
+# $(BUILD_DIR)/%_cuda.so: $(SRC_DIR)/cuda_kernels/%.cu.cc $(SRC_DIR)/cuda_kernels%.h $(BUILD_DIR)
 # 		$(NVCC) -c  $< -o $@ $(NVFLAGS) $(TORCH_INC)
 #
 # TODO(mgharbi): auto generate float/double variants
