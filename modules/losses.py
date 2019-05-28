@@ -2,6 +2,7 @@
 import torch as th
 
 from torchvision import models
+from torchvision import transforms
 
 
 class PSNR(th.nn.Module):
@@ -33,7 +34,7 @@ class PerceptualLoss(th.nn.Module):
         return a / th.sqrt(a + eps)
 
     def _cos_sim(self, a, b):
-        # ||a-b||^2 = ||a||^2 + ||b||^2 - 2<a|b>, with ||a|| = ||b|| = 1
+        # ||a-b||^2 = ||a||^2 + ||b||^2 - 2<a|b> = 2*cos_sim, with ||a|| = ||b|| = 1
         return self.mse(self._normalize(a), self._normalize(b))*0.5
 
     class _FeatureExtractor(th.nn.Module):
@@ -56,8 +57,12 @@ class PerceptualLoss(th.nn.Module):
             for p in self.parameters():
                 p.requires_grad = False
 
-            self.register_buffer("shift", th.Tensor([-0.030, -0.088, -0.188]).view(1, 3, 1, 1))
-            self.register_buffer("scale", th.Tensor([0.458, 0.448, 0.450]).view(1, 3, 1, 1))
+            # self.register_buffer("shift", th.Tensor([-0.030, -0.088, -0.188]).view(1, 3, 1, 1))
+            # self.register_buffer("scale", th.Tensor([0.458, 0.448, 0.450]).view(1, 3, 1, 1))
+            self.register_buffer("shift", th.Tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1))
+            self.register_buffer("scale", th.Tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1))
+            # self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+            #                                  std=[0.229, 0.224, 0.225])
 
         def forward(self, x):
             feats = []
