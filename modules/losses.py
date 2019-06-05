@@ -1,9 +1,11 @@
 """Collections of loss functions."""
 import torch as th
 
-from torchvision import models
-from torchvision import transforms
+import logging
 
+from torchvision import models
+
+LOG = logging.getLogger(__name__)
 
 class PSNR(th.nn.Module):
     def __init__(self):
@@ -15,10 +17,12 @@ class PSNR(th.nn.Module):
 
 
 class PerceptualLoss(th.nn.Module):
-    def __init__(self, pretrained=True, n_in=3):
+    def __init__(self, pretrained=True, n_in=3, normalize=True):
         super(PerceptualLoss, self).__init__()
         self.feature_extractor = PerceptualLoss._FeatureExtractor(pretrained, n_in)
         self.mse = th.nn.MSELoss()
+
+        self.normalize = normalize
 
     def forward(self, out, ref):
         out_f = self.feature_extractor(out)
@@ -34,8 +38,11 @@ class PerceptualLoss(th.nn.Module):
         return a / th.sqrt(a + eps)
 
     def _cos_sim(self, a, b):
-        # ||a-b||^2 = ||a||^2 + ||b||^2 - 2<a|b> = 2*cos_sim, with ||a|| = ||b|| = 1
-        return self.mse(self._normalize(a), self._normalize(b))*0.5
+        # ||a-b||^2 = ||a||^2 + ||b||^2 - 2<a|b>, with ||a|| = ||b|| = 1
+        if self.normalize:
+            return self.mse(self._normalize(a), self._normalize(b))*0.5
+        else:
+            return self.mse(a, b)*0.5
 
     class _FeatureExtractor(th.nn.Module):
         def __init__(self, pretrained, n_in):
@@ -44,25 +51,28 @@ class PerceptualLoss(th.nn.Module):
             if pretrained:
                 assert n_in == 3, "pretrained VGG feature extractor expects 3-channel input"
             vgg_pretrained = models.vgg16(pretrained=pretrained).features
-            breakpoints = [0, 4, 9, 16, 23, 30]
+            # breakpoints = [0, 4, 9, 16, 23, 30]
+            breakpoints = [0, 3]
             for i, b in enumerate(breakpoints[:-1]):
                 ops = th.nn.Sequential()
                 for idx in range(b, breakpoints[i+1]):
                     if idx == 0 and n_in != 3:
-                        ops.add_module(str(idx), th.nn.Conv2d(n_in, 64, 3, padding=1))
+                        LOG.error("input does not have 3 channels, using custom conv")
+                        raise ValueError()
+                        # ops.add_module(str(idx), th.nn.Conv2d(n_in, 64, 3, padding=1))
                     else:
-                        ops.add_module(str(idx), vgg_pretrained[idx])
+                        op = vgg_pretrained[idx]
+                        # TODO(mgharbi): remove invalid boundaries
+                        if hasattr(op, 'padding'):
+                            op.padding = (0, 0)
+                        ops.add_module(str(idx), op)
                 self.add_module("group{}".format(i), ops)
 
             for p in self.parameters():
                 p.requires_grad = False
 
-            # self.register_buffer("shift", th.Tensor([-0.030, -0.088, -0.188]).view(1, 3, 1, 1))
-            # self.register_buffer("scale", th.Tensor([0.458, 0.448, 0.450]).view(1, 3, 1, 1))
-            self.register_buffer("shift", th.Tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1))
-            self.register_buffer("scale", th.Tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1))
-            # self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-            #                                  std=[0.229, 0.224, 0.225])
+            self.register_buffer("shift", th.Tensor([-0.030, -0.088, -0.188]).view(1, 3, 1, 1))
+            self.register_buffer("scale", th.Tensor([0.458, 0.448, 0.450]).view(1, 3, 1, 1))
 
         def forward(self, x):
             feats = []

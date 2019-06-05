@@ -1,5 +1,12 @@
 """Utilities to train a model."""
 
+try:
+    import coloredlogs
+    coloredlogs.install()
+    HAS_COLORED_LOGS = True
+except:
+    HAS_COLORED_LOGS = False
+
 from abc import ABCMeta, abstractmethod
 import argparse
 import logging
@@ -59,9 +66,14 @@ def set_logger(debug=False):
     if debug:
         log_level = logging.DEBUG
         prefix += " %(filename)s:%(lineno)s"
-    logging.basicConfig(
-        level=log_level,
-        format=prefix+suffix)
+    if HAS_COLORED_LOGS:
+        coloredlogs.install(
+            level=log_level,
+            format=prefix+suffix)
+    else:
+        logging.basicConfig(
+            level=log_level,
+            format=prefix+suffix)
 
 
 class ModelInterface(metaclass=ABCMeta):
