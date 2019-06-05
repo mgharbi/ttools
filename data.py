@@ -37,7 +37,7 @@ class CachedDataset(th.utils.data.Dataset):
             # TODO(beware of multithreaded dataloader, maybe we need to have a locking mechanism on the file)
             dirname = os.path.dirname(newpath)
             os.makedirs(dirname)
-            LOG.warning("caching locally %s -> %s", path, newpath)
+            LOG.debug("caching locally %s -> %s", path, newpath)
             shutil.copy(path, newpath)
 
         # Return local path
