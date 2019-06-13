@@ -1,3 +1,8 @@
+"""Helpers classes and functions."""
+
+import torch as th
+import numpy as np
+
 class ExponentialMovingAverage(object):
     """Keyed tracker that maintains an exponential moving average for each key.
 
@@ -58,6 +63,34 @@ def parse_params(plist):
                 v = True
             params[k] = v
     return params
+
+
+def tensor2image(t, normalize=False):
+    """Converts an tensor image (4D tensor) to a numpy 8-bit array.
+    Args:
+        t(th.Tensor): input tensor with dimensions [bs, c, h, w], c=3, bs=1
+        normalize(bool): if True, normalize the tensor's range to [0, 1] before clipping
+    Returns:
+        (np.array): [h, w, c] image in uint8 format, with c=3
+    """
+
+    assert len(t.shape) == 4, "expected 4D tensor, got %d dimensions" % len(t.shape)
+    bs, c, h, w = t.shape
+
+    assert bs == 1, "expected batch_size 1 tensor, got %d" % bs
+    t = t.squeeze(0)
+
+    assert c == 3, "expected tensor with 3 channels, got %d" % c
+
+    if normalize:
+        m = t.min()
+        M = t.max()
+        t = (t-m) / (M-m+1e-8)
+
+
+    t = th.clamp(t.permute(1, 2, 0), 0, 1).cpu().detach().numpy()*255.0
+
+    return t.astype(np.uint8)
 
 # class Timer(object):
 #     """A simple named timer context.
