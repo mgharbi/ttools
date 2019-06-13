@@ -17,7 +17,7 @@ class PSNR(th.nn.Module):
 
 
 class PerceptualLoss(th.nn.Module):
-    def __init__(self, pretrained=True, n_in=3, normalize=True):
+    def __init__(self, pretrained=True, n_in=3, normalize=False):
         super(PerceptualLoss, self).__init__()
         self.feature_extractor = PerceptualLoss._FeatureExtractor(pretrained, n_in)
         self.mse = th.nn.MSELoss()

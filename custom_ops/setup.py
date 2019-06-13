@@ -70,6 +70,7 @@ sources = [wrapper_path]
 from torch.utils.cpp_extension import CUDAExtension
 extension = CUDAExtension(ext_name, sources,
                           extra_objects=hl_libs,
+                          libraries=["cuda"],  # Halide ops need the full cuda lib, not just the RT library
                           extra_compile_args=compile_args)
 # else:
 #   from torch.utils.cpp_extension import CppExtension
