@@ -428,9 +428,8 @@ class Checkpointer(object):
             LOG.warning("Trying to delete a checkpoint that does not exists.")
 
     @staticmethod
-    def load_meta(root):
+    def load_meta(root, prefix=None):
         """Fetch model metadata without touching the saved parameters."""
-        chkptr = Checkpointer(root, None, None)
-
+        chkptr = Checkpointer(root, None, None, prefix=prefix)
         _, meta = chkptr.load_latest()
         return meta
