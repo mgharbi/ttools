@@ -461,11 +461,43 @@ class ExperimentLoggerCallback(Callback):
        return subprocess.check_output(["git", "rev-parse", "HEAD"]) 
 
 
-class CSVLoggingCallback(Callback):
-    """A callback that logs scalar quantities to a .csv file."""
-    pass
+class CSVLoggingCallback(KeyedCallback):
+    """A callback that logs scalar quantities to a .csv file.
+
+    Format is:
+        epoch, step, event, key, value
+    """
+    def __init__(self, fname, keys=None, val_keys=None, smoothing=0):
+        super(CSVLoggingCallback, self).__init__(keys=keys, val_keys=val_keys, smoothing=smoothing)
+        self.fname = fname
+        self.fid = open(self.fname, 'w')
+
+        self.fid.write("epoch, step, event, key, value\n")
+        self.fid.write(",,logger_created,,\n")
+
+        # open file, check last event
+
+    def __del__(self):
+        LOG.info("deleting csv logger")
+        self.fid.write(",,logger_deleted,,\n")
+        self.fid.close()
+
+    def batch_end(self, batch_data, fwd, bwd_data):
+        """Logs training advancement Batch"""
+        super(CSVLoggingCallback, self).batch_end(batch_data, fwd, bwd_data)
+
+        for k in self.keys:
+            v = bwd_data[k]
+            self.fid.write("%d,%d,batch_end,%s,%f\n" % (self.epoch, self.batch, k, v))
+
+    def training_start(self, dataloader):
+        super(CSVLoggingCallback, self).training_start(dataloader)
+        self.fid.write(",,training_start,,\n")
+
+    def training_end(self):
+        super(CSVLoggingCallback, self).training_end()
+        self.fid.write(",,training_end,,\n")
 
 
 def _random_string(size=16):
     return ''.join([random.choice(string.ascii_letters) for i in range(size)])
-    

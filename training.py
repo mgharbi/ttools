@@ -113,9 +113,10 @@ class ModelInterface(metaclass=ABCMeta):
 
         return backward_data
 
-    @abstractmethod
     def init_validation(self):
         """Initializes the quantities to be reported during validation.
+
+        The default implementation is a no-op
 
         Returns:
           data (dict): initialized values
@@ -124,9 +125,10 @@ class ModelInterface(metaclass=ABCMeta):
         data = {}
         return data
 
-    @abstractmethod
     def update_validation(self, batch, fwd, running_data):
         """Updates the running val data using the current batch's forward output.
+
+        The default implementation is a no-op
 
         Args:
           batch (dict): batch of data provided by a data pipeline.
@@ -140,9 +142,10 @@ class ModelInterface(metaclass=ABCMeta):
         updated_data = {}
         return updated_data
 
-    @abstractmethod
     def finalize_validation(self, running_data):
         """Computes the final validation aggregates from the running data.
+
+        The default implementation is a no-op
 
         Args:
           running_data (dict): current aggregates of the validation loop.

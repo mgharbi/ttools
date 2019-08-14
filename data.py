@@ -42,4 +42,3 @@ class CachedDataset(th.utils.data.Dataset):
 
         # Return local path
         return newpath
-

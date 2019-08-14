@@ -1,4 +1,4 @@
-"""Dowmsampler with lowpass tent AA filters from Richard Zhang."""
+"""Dowmsampler with lowpass tent AA filters from Richard Zhang 2019."""
 # Copyright (c) 2019, Adobe Inc. All rights reserved.
 #
 # This work is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike
@@ -54,6 +54,7 @@ class Downsample(nn.Module):
                 return self.pad(inp)[:,:,::self.stride,::self.stride]
         else:
             return F.conv2d(self.pad(inp), self.filt, stride=self.stride, groups=inp.shape[1])
+
 
 def get_pad_layer(pad_type):
     if(pad_type in ['refl','reflect']):

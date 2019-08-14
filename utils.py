@@ -20,6 +20,8 @@ class ExponentialMovingAverage(object):
         return self._values[key]
 
     def update(self, key, value):
+        if value is None:
+            return
         if self._is_first_update[key]:
             self._values[key] = value
             self._is_first_update[key] = False
@@ -46,6 +48,8 @@ class Averager(object):
             self.counts[k] = 0
 
     def update(self, key, value, count=1):
+        if value is None:
+            return
         self.values[key] += value*count
         self.counts[key] += count
 
