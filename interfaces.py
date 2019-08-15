@@ -16,20 +16,18 @@ class GANInterface(ModelInterface, abc.ABC):
     Args:
         gen(th.nn.Module): generator.
         discrim(th.nn.Module): discriminator.
-        conditional(bool): if True, conditional GAN.
         lr(float): learning rate for both discriminator and generator.
         ncritic(int): number of discriminator updates per generator update.
         opt(str): optimizer type for both discriminator and generator.
         cuda(bool): whether or not to use CUDA.
     """
 
-    def __init__(self, gen, discrim, conditional=False, lr=1e-4, ncritic=1, opt="rmsprop",
+    def __init__(self, gen, discrim, lr=1e-4, ncritic=1, opt="rmsprop",
                  cuda=th.cuda.is_available()):
         super(GANInterface, self).__init__()
         self.gen = gen
         self.discrim = discrim
         self.ncritic = ncritic
-        self.conditional = conditional
 
         self.iter = 0
 
@@ -68,45 +66,32 @@ class GANInterface(ModelInterface, abc.ABC):
             z = z.cuda()
 
         # Generate a sample
-        if self.conditional:
-            generated = self.gen(z, label=label_)
-        else:
-            generated = self.gen(z)
+        generated = self.gen(z)
 
         return {"generated": generated, "z": z}
 
-    # def _discriminator_inputs(self, batch, fwd_data, fake=True):
-    #     real, label_ = batch
-    #     if self.cuda:
-    #         real = real.cuda()
-    #         label_ = label_.cuda()
-    #     generated = fwd_data["generated"]
-    #
-    #     if fake:
-    #         return generated
-
-    def backward(self, batch, fwd_data):
+    def _discriminator_input(self, batch, fwd_data, fake=False):
         real, label_ = batch
         if self.cuda:
             real = real.cuda()
             label_ = label_.cuda()
         generated = fwd_data["generated"]
+
+        if fake:
+            return generated
+        else:
+            return real
+
+    def backward(self, batch, fwd_data):
         if self.iter < self.ncritic:  # Update discriminator
-            if self.conditional:
-                fake_pred = self.discrim(generated.detach(), label=label_)
-                real_pred = self.discrim(real, label=label_)
-            else:
-                fake_pred = self.discrim(generated.detach())
-                real_pred = self.discrim(real)
+            fake_pred = self.discrim(self._discriminator_input(batch, fwd_data, True).detach())
+            real_pred = self.discrim(self._discriminator_input(batch, fwd_data, False))
             loss_d = self._update_discriminator(fake_pred, real_pred)
             loss_g = None
             self.iter += 1
         else:  # Update generator
             self.iter = 0
-            if self.conditional:
-                fake_pred_g = self.discrim(generated, label=label_)
-            else:
-                fake_pred_g = self.discrim(generated)
+            fake_pred_g = self.discrim(self._discriminator_input(batch, fwd_data, True))
             loss_g = self._update_generator(fake_pred_g)
             loss_d = None
 
