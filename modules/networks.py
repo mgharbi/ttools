@@ -346,17 +346,17 @@ class UNet(nn.Module):
             self.right = ConvChain(width + n_child_out, ksize=ksize, width=w, depth=num_convs, pad=True,
                                   activation=activation, norm_layer=norm_layer)
             self.child = child
-            self.interp_mode=interp_mode
+            self.interp_mode = interp_mode
 
         def forward(self, x):
             left_features = self.left(x)
             if self.child is not None:
                 ds = nn.functional.interpolate(
-                    left_features, scale_factor=0.5, mode=self.interp_mode)
+                    left_features, scale_factor=0.5, mode=self.interp_mode, align_corners=True)
                 child_features = self.child(ds)
                 us = nn.functional.interpolate(
                     child_features, size=left_features.shape[-2:],
-                    mode=self.interp_mode)
+                    mode=self.interp_mode, align_corners=True)
 
                 # skip connection
                 left_features = th.cat([left_features, us], 1)
