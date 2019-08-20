@@ -16,7 +16,13 @@ import visdom
 from .utils import ExponentialMovingAverage
 
 
-__all__ = ["Callback"]
+__all__ = [
+    "Callback",
+    "CheckpointingCallback",
+    "LoggingCallback",
+    "ProgressBarCallback",
+    "VisdomLoggingCallback",
+]
 
 
 LOG = logging.getLogger(__name__)
