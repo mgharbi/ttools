@@ -11,6 +11,7 @@ import subprocess
 import time
 
 from tqdm import tqdm
+from torchvision.utils import make_grid
 import visdom
 
 from .utils import ExponentialMovingAverage
@@ -507,3 +508,98 @@ class CSVLoggingCallback(KeyedCallback):
 
 def _random_string(size=16):
     return ''.join([random.choice(string.ascii_letters) for i in range(size)])
+
+
+# Tensorboard interface
+class TensorBoardLoggingCallback(Callback):
+    """A callback that logs scalar quantities to TensorBoard
+
+    Args:
+      keys (list of str): list of keys whose values will be logged during training.
+      val_keys (list of str): list of keys whose values will be logged during validation
+      frequency(int): number of steps between display updates.
+      log_di (str)
+    """
+
+    def __init__(self, writer, val_writer, keys=None, val_keys=None, frequency=100, summary_type='scalar'):
+        super(TensorBoardLoggingCallback, self).__init__()
+        self.keys = keys
+        self.val_keys = val_keys or self.keys
+        self._writer = writer
+        self._val_writer = val_writer
+        self._step = 0
+        self.frequency = frequency
+        self.summary_type = summary_type
+
+    def batch_end(self, batch_data, fwd, bwd):
+        super(TensorBoardLoggingCallback, self).batch_end(batch_data, fwd, bwd)
+
+        if self._step % self.frequency != 0:
+            self._step += 1
+            return
+        self._step = 0
+
+        t = self.batch + self.datasize * self.epoch
+
+        for k in self.keys:
+            if self.summary_type == 'scalar':
+                self._writer.add_scalar(k, bwd[k], global_step=t)
+            elif self.summary_type == 'histogram':
+                self._writer.add_histogram(k, bwd[k], global_step=t)
+        self._step += 1
+
+    def validation_end(self, val_data):
+        super(TensorBoardLoggingCallback, self).validation_end(val_data)
+
+
+class TensorBoardImageDisplayCallback(Callback, abc.ABC):
+    """Displays image periodically to TensorBoard.
+
+    This is an abstract class, subclasses should implement the visualized_image
+    method that synthesizes a [B, C, H, W] image to be visualized.
+
+    Args:
+      frequency(int): number of optimization steps between two updates
+    """
+
+    def __init__(self, writer, val_writer, frequency=100):
+        super(TensorBoardImageDisplayCallback, self).__init__()
+        self._writer = writer
+        self._val_writer = val_writer
+        self.freq = frequency
+        self._step = 0
+
+    @abc.abstractmethod
+    def visualized_image(self, batch, fwd_result):
+        pass
+
+    @abc.abstractmethod
+    def tag(self):
+        pass
+
+    def batch_end(self, batch, fwd_result, bwd_result):
+        if self._step % self.freq != 0:
+            self._step += 1
+            return
+
+        self._step = 0
+
+        viz = self.visualized_image(batch, fwd_result)
+        t = self.batch + self.datasize * self.epoch
+        self._writer.add_image(self.tag(), make_grid(viz), t)
+        self._step += 1
+
+    def validation_start(self, dataloader):
+        super(TensorBoardImageDisplayCallback, self).validation_start(dataloader)
+        self.first_step = True
+
+    def validation_step(self, batch, fwd_data, val_data):
+        super(TensorBoardImageDisplayCallback, self).validation_step(batch, fwd_data, val_data)
+        if not self.first_step:
+            return
+
+        viz = self.visualized_image(batch, fwd_data)
+        t = self.datasize * (self.epoch+1)
+        self._val_writer.add_image(self.tag(), make_grid(viz), t)
+        self.first_step = False
+
