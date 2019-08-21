@@ -21,6 +21,7 @@ __all__ = [
     "Callback",
     "CheckpointingCallback",
     "LoggingCallback",
+    "ImageDisplayCallback",
     "ProgressBarCallback",
     "VisdomLoggingCallback",
 ]
