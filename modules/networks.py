@@ -381,12 +381,16 @@ def _get_norm_layer(norm_layer, channels):
 
 
 def _get_activation(activation):
-    valid = ["relu", "leaky_relu", "lrelu"]
+    valid = ["relu", "leaky_relu", "lrelu", "tanh", "sigmoid"]
     assert activation in valid, "activation should be one of {}".format(valid)
     if activation == "relu":
         return nn.ReLU(inplace=True)
     if activation == "leaky_relu" or activation == "lrelu":
         return nn.LeakyReLU(inplace=True)
+    if activation == "sigmoid":
+        return nn.Sigmoid()
+    if activation == "tanh":
+        return nn.Tanh()
     return None
 
 
