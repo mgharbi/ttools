@@ -4,6 +4,9 @@ import time
 import torch as th
 import numpy as np
 
+__all__ = ["ExponentialMovingAverage", "Averager", "Timer", "tensor2image"]
+
+
 class ExponentialMovingAverage(object):
     """Keyed tracker that maintains an exponential moving average for each key.
 
@@ -53,21 +56,6 @@ class Averager(object):
             return
         self.values[key] += value*count
         self.counts[key] += count
-
-
-def parse_params(plist):
-    params = {}
-    if plist is not None:
-        for p in plist:
-            k, v = p.split("=")
-            if v.isdigit():
-                v = int(v)
-            elif v == "False":
-                v = False
-            elif v == "True":
-                v = True
-            params[k] = v
-    return params
 
 
 def tensor2image(t, normalize=False):

@@ -26,6 +26,14 @@ setuptools.setup(
     packages=["ttools"],
     include_package_data=True,
     license="MIT",
+    install_requires=[
+        "torch",
+        "tqdm",
+        "numpy",
+        "torchvision",
+        "coloredlogs",
+        "visdom",
+    ],
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Programming Language :: Python :: 3",

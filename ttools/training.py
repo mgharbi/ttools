@@ -20,6 +20,9 @@ import torch as th
 LOG = logging.getLogger(__name__)
 
 
+__all__ = ["ModelInterface", "Trainer", "Checkpointer", "BasicArgumentParser", "set_logger"]
+
+
 class BasicArgumentParser(argparse.ArgumentParser):
     """A basic argument parser with commonly used training options."""
 
@@ -59,7 +62,12 @@ class BasicArgumentParser(argparse.ArgumentParser):
 
 
 def set_logger(debug=False):
-    """Set the default logging level and log format."""
+    """Set the default logging level and log format.
+
+    Args:
+        debug(bool): if True, enable debug logs.
+    """
+
     log_level = logging.INFO
     prefix = "[%(process)d] %(levelname)s %(name)s"
     suffix = " | %(message)s"

@@ -12,6 +12,6 @@ custom_ops:
 
 clean:
 	python setup.py clean
-	rm -rf build ttools.egg-info
+	rm -rf build ttools.egg-info dist
 
 .PHONY: custom_ops

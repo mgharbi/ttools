@@ -6,3 +6,4 @@ data/
 .cache
 ttools.egg-info
 build/
+dist
