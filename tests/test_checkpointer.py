@@ -5,7 +5,7 @@ import unittest
 
 import torch as th
 
-from .. import Checkpointer
+from ttools import Checkpointer
 
 
 class TestCheckpointer(unittest.TestCase):

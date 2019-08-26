@@ -11,6 +11,7 @@ custom_ops:
 	$(MAKE) -C $@
 
 clean:
-	$(MAKE) -C custom_ops clean 
+	python setup.py clean
+	rm -rf build ttools.egg-info
 
 .PHONY: custom_ops

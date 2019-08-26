@@ -1,3 +1,4 @@
+"""Build and install script for ttools."""
 import re
 import setuptools
 

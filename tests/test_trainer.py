@@ -5,9 +5,9 @@ import unittest
 import numpy as np
 import torch.utils.data
 
-from .. import ModelInterface
-from .. import Trainer
-from .. import Callback
+from ttools import ModelInterface
+from ttools import Trainer
+from ttools import Callback
 
 
 class DummyInterface(ModelInterface):

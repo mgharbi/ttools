@@ -3,8 +3,8 @@ import unittest
 import torch as th
 import torch.nn as nn
 
-from ..modules import networks
-from ..modules import ops
+from ttools.modules import networks
+from ttools.modules import ops
 
 
 class TestConvModule(unittest.TestCase):

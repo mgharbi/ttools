@@ -8,7 +8,7 @@ import time
 import numpy as np
 import torch.utils.data
 
-from ..data import CachedDataset
+from ttools.data import CachedDataset
 
 
 class TestCachedDataset(unittest.TestCase):
