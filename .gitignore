@@ -4,3 +4,5 @@ checkpoints
 data/
 .coverage
 .cache
+ttools.egg-info
+build/
