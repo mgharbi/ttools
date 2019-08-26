@@ -4,4 +4,4 @@ import unittest
 
 import torch as th
 
-from ..callbacks import *
+from ttools.callbacks import *
