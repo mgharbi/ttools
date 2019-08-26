@@ -1,4 +1,5 @@
 """Helpers classes and functions."""
+import time
 
 import torch as th
 import numpy as np
@@ -96,21 +97,32 @@ def tensor2image(t, normalize=False):
 
     return t.astype(np.uint8)
 
-# class Timer(object):
-#     """A simple named timer context.
-#
-#     Usage:
-#       with Timer("header_name"):
-#         do_sth()
-#     """
-#
-#     def __init__(self, header=""):
-#         self.header = header
-#         self.time = 0
-#
-#     def __enter__(self):
-#         self.time = time.time()
-#
-#     def __exit__(self, tpye, value, traceback):
-#         elapsed = (time.time()-self.time)*1000
-#         print("{}, {:.1f}ms".format(self.header, elapsed))
+
+class Timer(object):
+    """A simple timer context.
+
+    Returns timing in ms
+
+    Usage:
+      with Timer("header_name") as t:
+        do_sth()
+      print(t.elapsed)
+
+    Args:
+        sync(bool): if True, synchronize CUDA kernels.
+
+    """
+
+    def __init__(self, sync=True):
+        self._time = 0
+        self.sync = sync
+        self.elapsed = None
+
+    def __enter__(self):
+        th.cuda.synchronize()
+        self._time = time.time()
+        return self
+
+    def __exit__(self, tpye, value, traceback):
+        th.cuda.synchronize()
+        self.elapsed = (time.time()-self._time)*1000
