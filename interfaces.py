@@ -23,11 +23,12 @@ class GANInterface(ModelInterface, abc.ABC):
     """
 
     def __init__(self, gen, discrim, lr=1e-4, ncritic=1, opt="rmsprop",
-                 cuda=th.cuda.is_available()):
+                 cuda=th.cuda.is_available(), loss_scale=None):
         super(GANInterface, self).__init__()
         self.gen = gen
         self.discrim = discrim
         self.ncritic = ncritic
+        self.loss_scale = loss_scale
 
         self.iter = 0
 
@@ -70,6 +71,14 @@ class GANInterface(ModelInterface, abc.ABC):
 
         return {"generated": generated, "z": z}
 
+    def _extra_generator_loss(self, batch, fwd_data):
+        """Computes extra losses if needed.
+
+        Returns:
+            th.Tensor with shape [1], the total extra loss.
+        """
+        return None
+
     def _discriminator_input(self, batch, fwd_data, fake=False):
         real, label_ = batch
         if self.cuda:
@@ -83,6 +92,7 @@ class GANInterface(ModelInterface, abc.ABC):
             return real
 
     def backward(self, batch, fwd_data):
+        loss = self._extra_generator_loss(batch, fwd_data)
         if self.iter < self.ncritic:  # Update discriminator
             fake_pred = self.discrim(self._discriminator_input(batch, fwd_data, True).detach())
             real_pred = self.discrim(self._discriminator_input(batch, fwd_data, False))
@@ -92,17 +102,20 @@ class GANInterface(ModelInterface, abc.ABC):
         else:  # Update generator
             self.iter = 0
             fake_pred_g = self.discrim(self._discriminator_input(batch, fwd_data, True))
-            loss_g = self._update_generator(fake_pred_g)
+            loss_g = self._update_generator(fake_pred_g, loss)
             loss_d = None
 
-        return { "loss_g": loss_g, "loss_d": loss_d }
+        if loss is not None:
+            loss = loss.item()
+
+        return { "loss_g": loss_g, "loss_d": loss_d, "loss": loss}
 
     @abc.abstractmethod
     def _update_discriminator(self, fake_pred, real_pred):
         pass
 
     @abc.abstractmethod
-    def _update_generator(self, fake_pred):
+    def _update_generator(self, fake_pred, extra_loss):
         pass
 
 
@@ -123,8 +136,12 @@ class LSGANInterface(GANInterface):
         self.opt_d.step()
         return loss_d.item()
 
-    def _update_generator(self, fake_pred):
+    def _update_generator(self, fake_pred, extra_loss):
         loss_g = self.mse(fake_pred, th.ones_like(fake_pred))
+        if self.loss_scale is not None:
+            loss_g *= self.loss_scale
+        if extra_loss is not None:
+            loss_g = loss_g + extra_loss
         self.opt_g.zero_grad()
         loss_g.backward()
         self.opt_g.step()
@@ -157,8 +174,12 @@ class WGANInterface(GANInterface):
 
         return loss_d.item()
 
-    def _update_generator(self, fake_pred):
+    def _update_generator(self, fake_pred, extra_loss):
         loss_g = -fake_pred.mean()
+        if self.loss_scale is not None:
+            loss_g *= self.loss_scale
+        if extra_loss is not None:
+            loss_g = loss_g + loss
         self.opt_g.zero_grad()
         loss_g.backward()
         self.opt_g.step()
