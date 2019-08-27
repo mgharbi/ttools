@@ -1,14 +1,14 @@
-# Torch tools
-
-Michaël Gharbi <gharbi@mit.edu>
+Readme
+======
 
 A library of helpers for PyTorch.
 
+Michaël Gharbi <gharbi@mit.edu>
 
-# Installation
+
+Installation
+------------
 
 From this repo:
 
-```shell
-python setup.py install
-```
+``python setup.py install``
