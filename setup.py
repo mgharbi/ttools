@@ -13,6 +13,7 @@ with open('ttools/version.py') as fid:
 with open("README.rst", "r") as fh:
     long_description = fh.read()
 
+packages = setuptools.find_packages(exclude=["tests"])
 
 setuptools.setup(
     name="torch-tools",
@@ -23,7 +24,7 @@ setuptools.setup(
     description="A library of helpers to train, evaluate and visualize deep nets with PyTorch.",
     long_description=long_description,
     url="https://github.com/mgharbi/ttools",
-    packages=["ttools"],
+    packages=packages,
     include_package_data=True,
     license="MIT",
     install_requires=[
