@@ -13,7 +13,7 @@ visdom_server:
 
 clean:
 	python setup.py clean
-	rm -rf build ttools.egg-info dist .pytest_cache
+	rm -rf build torch_tools.egg-info dist .pytest_cache
 
 distribution:
 	python setup.py sdist bdist_wheel
