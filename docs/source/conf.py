@@ -36,6 +36,8 @@ with open(os.path.join(rootdir, "ttools/version.py")) as fid:
 
 release = __version__
 
+master_doc = "index"
+
 
 # -- General configuration ---------------------------------------------------
 
