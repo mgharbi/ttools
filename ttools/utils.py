@@ -91,11 +91,6 @@ class Timer(object):
 
     Returns timing in ms
 
-    Usage:
-      with Timer("header_name") as t:
-        do_sth()
-      print(t.elapsed)
-
     Args:
         sync(bool): if True, synchronize CUDA kernels.
 
