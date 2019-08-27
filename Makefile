@@ -17,9 +17,12 @@ clean:
 	python setup.py clean
 	rm -rf build ttools.egg-info dist .pytest_cache
 
-test_distribution:
+distribution:
 	python setup.py sdist bdist_wheel
 	twine check dist/*
 
-upload_distribution:
+test_upload:
 	twine upload --repository-url https://test.pypi.org/legacy/ dist/*
+
+upload_distribution:
+	twine upload dist/*
