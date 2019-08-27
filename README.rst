@@ -13,6 +13,14 @@ From this repo:
 
 ``python setup.py install``
 
+
+Demo
+----
+
+For a simple demo, look at the MNIST example in `examples/train_mnist.py`:
+
+``python examples/train_mnist.py data out``
+
 Contributors
 ------------
 
