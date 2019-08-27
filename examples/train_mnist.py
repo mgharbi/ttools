@@ -107,8 +107,8 @@ class MNISTInterface(ttools.ModelInterface):
         bs = label.shape[0]
 
         with th.no_grad():
-            i_loss = self._ce(prediction, label)
-            i_acc = self._accuracy(prediction, label)
+            i_loss = self._ce(prediction, label).item()
+            i_acc = self._accuracy(prediction, label).item()
 
         return {
             "accuracy": self._update_mean(acc, count, i_acc*bs, bs),

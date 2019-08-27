@@ -12,3 +12,8 @@ Installation
 From this repo:
 
 ``python setup.py install``
+
+Contributors
+------------
+
+Dima Smirnov implemented the tensorboard hooks and callbacks.
