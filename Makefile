@@ -16,3 +16,10 @@ visdom_server:
 clean:
 	python setup.py clean
 	rm -rf build ttools.egg-info dist .pytest_cache
+
+test_distribution:
+	python setup.py sdist bdist_wheel
+	twine check dist/*
+
+upload_distribution:
+	twine upload --repository-url https://test.pypi.org/legacy/ dist/*

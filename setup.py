@@ -10,12 +10,12 @@ with open('ttools/version.py') as fid:
         raise ValueError("could not find version number")
 
 
-with open("README.md", "r") as fh:
+with open("README.rst", "r") as fh:
     long_description = fh.read()
 
 
 setuptools.setup(
-    name="ttools",
+    name="torch-tools",
     version=__version__,
     scripts=[],
     author="Michaël Gharbi",

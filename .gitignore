@@ -7,3 +7,4 @@ data/
 ttools.egg-info
 build/
 dist
+torch_tools.egg-info

@@ -9,8 +9,10 @@ Michaël Gharbi <mgharbi@adobe.com>
 Installation
 ------------
 
-From this repo:
+From pip:
+``pip install torch_tools``
 
+From source:
 ``python setup.py install``
 
 
