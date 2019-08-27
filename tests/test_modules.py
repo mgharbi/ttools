@@ -4,7 +4,6 @@ import torch as th
 import torch.nn as nn
 
 from ttools.modules import networks
-from ttools.modules import ops
 
 
 class TestConvModule(unittest.TestCase):
@@ -293,32 +292,3 @@ class TestUnet(unittest.TestCase):
         unet = networks.UNet(self.c, self.c_out)
         print(unet)
         out = unet(self.in_data)
-
-
-# class TestKernelLookup(unittest.TestCase):
-#     def setUp(self):
-#         self.bs = 1
-#         self.c = 1
-#         self.c_out = 1
-#         self.h = 32
-#         self.w = 32
-#         self.in_data = th.ones(self.bs, self.c, self.h, self.w)
-#         self.kidx = th.ones(self.bs, self.c_out, self.h, self.w).int()
-#         self.op = ops.KernelLookup(self.c, 3, 64)
-#
-#         if th.cuda.is_available():
-#           self.in_data = self.in_data.cuda()
-#           self.kidx = self.kidx.cuda()
-#           self.op.cuda()
-#
-#     def test_dirac(self):
-#         self.in_data.data.fill_(0.0)
-#         self.in_data.data[0, 0, 10, 10] = 1.45
-#
-#         self.op.weights.data.fill_(0.0)
-#         self.op.weights.data[1, 0, 1, 1] = 1.0
-#         print(self.op.weights)
-#
-#         out = self.op(self.in_data, self.kidx)
-#
-#         assert(out[0, 0, 10, 10] == 1.45)

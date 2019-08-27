@@ -1,6 +1,4 @@
-all: custom_ops
-
-test: custom_ops
+test:
 	py.test tests
 
 .PHONY: docs
