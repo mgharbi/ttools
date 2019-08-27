@@ -7,6 +7,7 @@ from torchvision import models
 
 LOG = logging.getLogger(__name__)
 
+
 class PSNR(th.nn.Module):
     def __init__(self):
         super(PSNR, self).__init__()

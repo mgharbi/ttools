@@ -1,5 +1,6 @@
 """Utilities to load and save data."""
 
+
 def read_pfm(path):
     with open(path, 'rb') as fid:
         identifier = fid.readline().strip()
