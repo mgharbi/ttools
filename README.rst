@@ -3,7 +3,7 @@ Readme
 
 A library of helpers for PyTorch.
 
-Michaël Gharbi <gharbi@mit.edu>
+Michaël Gharbi <mgharbi@adobe.com>
 
 
 Installation
