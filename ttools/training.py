@@ -20,7 +20,8 @@ import torch as th
 LOG = logging.getLogger(__name__)
 
 
-__all__ = ["ModelInterface", "Trainer", "Checkpointer", "BasicArgumentParser", "set_logger"]
+__all__ = ["ModelInterface", "Trainer", "Checkpointer", "BasicArgumentParser", 
+           "set_logger", "get_logger"]
 
 
 class BasicArgumentParser(argparse.ArgumentParser):
@@ -82,6 +83,15 @@ def set_logger(debug=False):
         logging.basicConfig(
             level=log_level,
             format=prefix+suffix)
+
+
+def get_logger(name):
+    """Get a named logger.
+
+    Args:
+        name(string): name of the logger
+    """
+    return logging.getLogger(name)
 
 
 class ModelInterface(metaclass=ABCMeta):
