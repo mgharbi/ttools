@@ -248,12 +248,6 @@ class ResidualBlock(nn.Module):
                       depth=n_convs-1, pad=True, activation=activation, norm_layer=norm_layer),
             ConvModule(n_features, n_features, ksize=ksize, stride=1, pad=True, activation=None, norm_layer=None)  # last layer has no activation
         )
-        # for idx in range(n_convs):
-        #     conv = nn.Conv2d(n_features, n_features, ksize, stride=1, padding=padding, bias=True)
-        #     self.convpath.append(conv)
-        #     if activation is not None and idx < n_convs-1:  # no activation on the last
-        #         self.convpath.append(_get_activation(activation))
-        #     _init_fc_or_conv(conv, activation)
 
         self.post_skip_activation = None
         if activation:
