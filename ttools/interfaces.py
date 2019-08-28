@@ -144,6 +144,12 @@ class LSGANInterface(GANInterface):
             loss_g = loss_g + extra_loss
         self.opt_g.zero_grad()
         loss_g.backward()
+
+        clip = 1
+        actual = th.nn.utils.clip_grad_norm_(self.gen.parameters(), clip)
+        if actual > clip:
+          LOG.info("clipped gradients {} -> {}".format(clip, actual))
+
         self.opt_g.step()
         return loss_g.item()
 

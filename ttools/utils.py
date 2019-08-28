@@ -4,7 +4,50 @@ import time
 import torch as th
 import numpy as np
 
-__all__ = ["ExponentialMovingAverage", "Averager", "Timer", "tensor2image"]
+import logging
+try:
+    import coloredlogs
+    coloredlogs.install()
+    HAS_COLORED_LOGS = True
+except:
+    HAS_COLORED_LOGS = False
+
+
+__all__ = ["ExponentialMovingAverage", "Averager", "Timer", "tensor2image", "get_logger", "set_logger"]
+
+
+def set_logger(debug=False):
+    """Set the default logging level and log format.
+
+    Args:
+        debug(bool): if True, enable debug logs.
+    """
+
+    log_level = logging.INFO
+    prefix = "[%(process)d] %(levelname)s %(name)s"
+    suffix = " | %(message)s"
+    if debug:
+        log_level = logging.DEBUG
+        prefix += " %(filename)s:%(lineno)s"
+    if HAS_COLORED_LOGS:
+        coloredlogs.install(
+            level=log_level,
+            format=prefix+suffix)
+    else:
+        logging.basicConfig(
+            level=log_level,
+            format=prefix+suffix)
+
+
+def get_logger(name):
+    """Get a named logger.
+
+    Args:
+        name(string): name of the logger
+    """
+    return logging.getLogger(name)
+
+
 
 
 class ExponentialMovingAverage(object):

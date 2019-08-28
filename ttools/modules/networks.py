@@ -6,6 +6,11 @@
 import torch as th
 from torch import nn
 
+from ..utils import get_logger
+
+
+LOG = get_logger(__name__)
+
 
 class FCModule(nn.Module):
     """Basic fully connected module with optional dropout.
@@ -213,14 +218,19 @@ class ConvChain(nn.Module):
 
 
 class ResidualBlock(nn.Module):
-    """Basic residual block with activation(optional) + conv.
+    """Basic residual block from [He 2015].
+
+    <https://arxiv.org/pdf/1512.03385.pdf>
 
     Args:
       n_features(int): number of input/output channels.
+      ksize(int): size of the convolution kernel (square).
+      n_convs(int): number of convolutions in the non-skip path.
       activation(str): nonlinear activation function between convolutions.
+      norm_layer(str): normalization to apply between the convolution modules.
     """
 
-    def __init__(self, n_features, ksize=3, n_convs=2, activation=None):
+    def __init__(self, n_features, ksize=3, n_convs=2, activation=None, norm_layer=None):
         super(ResidualBlock, self).__init__()
 
         assert isinstance(n_features, int) and n_features > 0, \
@@ -228,26 +238,31 @@ class ResidualBlock(nn.Module):
         assert isinstance(
             ksize, int) and ksize > 0, "Kernel size should be a positive integer got {}".format(ksize)
         assert isinstance(
-            n_convs, int) and n_convs > 0, "Number of convolutions should be positive"
+            n_convs, int) and n_convs >= 2, "Number of convolutions should be at least 2."
 
         padding = (ksize - 1) // 2
 
-        for idx in range(n_convs):
-            if activation is not None:
-                self.add_module("activation{}".format(idx), _get_activation(activation))
-            convname = "conv{}".format(idx)
-            self.add_module(convname, nn.Conv2d(n_features, n_features, ksize, 
-                                              stride=1, padding=padding, 
-                                              bias=True))
+        self.n_convs = n_convs
+        self.convpath = th.nn.Sequential(
+            ConvChain(n_features, ksize=ksize, width=n_features,
+                      depth=n_convs-1, pad=True, activation=activation, norm_layer=norm_layer),
+            ConvModule(n_features, n_features, ksize=ksize, stride=1, pad=True, activation=None, norm_layer=None)  # last layer has no activation
+        )
+        # for idx in range(n_convs):
+        #     conv = nn.Conv2d(n_features, n_features, ksize, stride=1, padding=padding, bias=True)
+        #     self.convpath.append(conv)
+        #     if activation is not None and idx < n_convs-1:  # no activation on the last
+        #         self.convpath.append(_get_activation(activation))
+        #     _init_fc_or_conv(conv, activation)
 
-            _init_fc_or_conv(getattr(self, convname), activation)
+        self.post_skip_activation = None
+        if activation:
+            self.post_skip_activation = _get_activation(activation)
 
     def forward(self, x):
-        straight = x  # unprocessed path
-        x = x.clone()
-        for c in self.children():
-            x = c(x)
-        x = x + straight  # residual connection
+        x = self.convpath(x) + x  # residual connection
+        if self.post_skip_activation is not None:
+            x = self.post_skip_activation(x)
         return x
 
 
@@ -260,11 +275,13 @@ class ResidualChain(nn.Module):
       depth(int): number of residual blocks
       convs_per_block(int): number of convolution per residual block
       activation(str): nonlinear activation function between convolutions.
+      norm_layer(str): normalization to apply between the convolution modules.
     """
 
     def __init__(self, n_features, ksize=3, depth=3, convs_per_block=2,
-                 activation="relu"):
+                 activation="relu", norm_layer=None):
         super(ResidualChain, self).__init__()
+        LOG.warn("ResidualChain has not been tested, beware!")
 
         assert isinstance(
             n_features, int) and n_features > 0, "Number of feature channels should be a positive integer"
@@ -278,7 +295,8 @@ class ResidualChain(nn.Module):
             self.add_module(
                 "resblock{}".format(lvl),
                 ResidualBlock(n_features, ksize=ksize, 
-                              n_convs=convs_per_block, activation=activation))
+                              n_convs=convs_per_block, activation=activation,
+                              norm_layer=norm_layer))
 
     def forward(self, x):
         for m in self.children():

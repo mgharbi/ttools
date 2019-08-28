@@ -292,3 +292,85 @@ class TestUnet(unittest.TestCase):
         unet = networks.UNet(self.c, self.c_out)
         print(unet)
         out = unet(self.in_data)
+
+
+class TestResidualBlock(unittest.TestCase):
+    def setUp(self):
+        self.bs = 1
+        self.c = 32
+        self.h = 16
+        self.w = 16
+        self.in_ = th.zeros(self.bs, self.c, self.h, self.w)
+
+    def test_basic_conv(self):
+        cv = networks.ResidualBlock(self.c, ksize=3, n_convs=2, activation="relu")
+        out_ = cv(self.in_)
+
+        self.assertListEqual(list(out_.shape), [self.bs, self.c, self.h, self.w])
+        self.assertAlmostEqual(out_.abs().max().item(), 0.0)
+
+        # should have a convpath and an activation op
+        self.assertEqual(len(list(cv.children())), 2)
+
+        # should have a convchain and a plain conv
+        self.assertEqual(len(list(cv.convpath.children())), 2)
+        convpath = list(cv.convpath.children())
+        relu = cv.post_skip_activation
+        self.assertIsInstance(convpath[0], networks.ConvChain)
+        self.assertIsInstance(convpath[1], networks.ConvModule)
+
+        # should have a post activation
+        self.assertIsInstance(relu, th.nn.ReLU)
+
+        # Disable conv path
+        convpath[1].conv.weight.data.zero_()
+        convpath[1].conv.bias.data.zero_()
+        convpath[0].conv0.conv.weight.data.zero_()
+        convpath[0].conv0.conv.bias.data.zero_()
+
+        # Set some positive data and forward
+        th.nn.init.uniform_(self.in_)
+        out_ = cv(self.in_)
+
+        # Make sure residual path is correct
+        diff = th.abs(out_ - self.in_).max().item()
+        self.assertAlmostEqual(diff, 0.0)
+
+        # Set some signed data and forward
+        th.nn.init.uniform_(self.in_, -1.0, 1.0)
+        out_ = cv(self.in_)
+
+        # max sure the negative part is clamped
+        diff = th.abs(out_ - self.in_).max().item()
+        self.assertAlmostEqual(diff, -self.in_.min().item(), places=7)
+        diff = th.abs(out_ - th.clamp(self.in_, 0, 1)).max().item()
+        self.assertAlmostEqual(diff, 0.0)
+
+    def test_at_least_two_cons(self):
+        with self.assertRaises(AssertionError) as e:
+            cv = networks.ResidualBlock(self.c, ksize=3, n_convs=1, activation="relu")
+
+    def test_normalization(self):
+        cv = networks.ResidualBlock(self.c, ksize=3, n_convs=2, activation="relu", norm_layer="batch")
+        out_ = cv(self.in_)
+
+        self.assertListEqual(list(out_.shape), [self.bs, self.c, self.h, self.w])
+        self.assertAlmostEqual(out_.abs().max().item(), 0.0)
+
+        convpath = list(cv.convpath.children())
+        self.assertEqual(len(list(convpath[0].conv0.children())), 3)
+        if not hasattr(convpath[0].conv0, "norm"):
+            raise AssertionError("Convolution should have a batchnorm op")
+        self.assertIsInstance(convpath[0].conv0.norm, th.nn.BatchNorm2d)
+
+
+class TestResidualChain(unittest.TestCase):
+    def setUp(self):
+        self.bs = 1
+        self.c = 32
+        self.h = 16
+        self.w = 16
+        self.in_ = th.zeros(self.bs, self.c, self.h, self.w)
+
+    def test_basic_conv(self):
+        cv = networks.ResidualChain(self.c, ksize=3, convs_per_block=2, activation="relu")

@@ -1,27 +1,20 @@
 """Utilities to train a model."""
 
-try:
-    import coloredlogs
-    coloredlogs.install()
-    HAS_COLORED_LOGS = True
-except:
-    HAS_COLORED_LOGS = False
-
 from abc import ABCMeta, abstractmethod
 import argparse
-import logging
 import os
 import re
 import signal
 
 import torch as th
 
+from .utils import get_logger
 
-LOG = logging.getLogger(__name__)
+
+LOG = get_logger(__name__)
 
 
-__all__ = ["ModelInterface", "Trainer", "Checkpointer", "BasicArgumentParser", 
-           "set_logger", "get_logger"]
+__all__ = ["ModelInterface", "Trainer", "Checkpointer", "BasicArgumentParser"]
 
 
 class BasicArgumentParser(argparse.ArgumentParser):
@@ -60,38 +53,6 @@ class BasicArgumentParser(argparse.ArgumentParser):
         self.add_argument('--debug', dest="debug", action="store_true")
 
         self.set_defaults(cuda=th.cuda.is_available(), debug=False)
-
-
-def set_logger(debug=False):
-    """Set the default logging level and log format.
-
-    Args:
-        debug(bool): if True, enable debug logs.
-    """
-
-    log_level = logging.INFO
-    prefix = "[%(process)d] %(levelname)s %(name)s"
-    suffix = " | %(message)s"
-    if debug:
-        log_level = logging.DEBUG
-        prefix += " %(filename)s:%(lineno)s"
-    if HAS_COLORED_LOGS:
-        coloredlogs.install(
-            level=log_level,
-            format=prefix+suffix)
-    else:
-        logging.basicConfig(
-            level=log_level,
-            format=prefix+suffix)
-
-
-def get_logger(name):
-    """Get a named logger.
-
-    Args:
-        name(string): name of the logger
-    """
-    return logging.getLogger(name)
 
 
 class ModelInterface(metaclass=ABCMeta):
