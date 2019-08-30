@@ -6,8 +6,10 @@ import torch as th
 
 from . import ModelInterface
 
+from .utils import get_logger
 
-LOG = logging.getLogger(__name__)
+
+LOG = get_logger(__name__)
 
 
 class GANInterface(ModelInterface, abc.ABC):
@@ -50,6 +52,7 @@ class GANInterface(ModelInterface, abc.ABC):
         else:
             raise ValueError("invalid optimizer %s" % opt)
 
+    # TODO(mgharbi): make abstract method
     def forward(self, batch):
         """Generate a sample.
 
@@ -72,7 +75,7 @@ class GANInterface(ModelInterface, abc.ABC):
         return {"generated": generated, "z": z}
 
     def _extra_generator_loss(self, batch, fwd_data):
-        """Computes extra losses if needed.
+        """Computes extra losses from the generator if needed.
 
         Returns:
             th.Tensor with shape [1], the total extra loss.
@@ -94,6 +97,7 @@ class GANInterface(ModelInterface, abc.ABC):
     def backward(self, batch, fwd_data):
         loss = self._extra_generator_loss(batch, fwd_data)
         if self.iter < self.ncritic:  # Update discriminator
+            # We detach the generated samples, so that no grads propagate to the generator here
             fake_pred = self.discrim(self._discriminator_input(batch, fwd_data, True).detach())
             real_pred = self.discrim(self._discriminator_input(batch, fwd_data, False))
             loss_d = self._update_discriminator(fake_pred, real_pred)
@@ -102,7 +106,8 @@ class GANInterface(ModelInterface, abc.ABC):
         else:  # Update generator
             self.iter = 0
             fake_pred_g = self.discrim(self._discriminator_input(batch, fwd_data, True))
-            loss_g = self._update_generator(fake_pred_g, loss)
+            real_pred_g = self.discrim(self._discriminator_input(batch, fwd_data, False))
+            loss_g = self._update_generator(fake_pred_g, real_pred_g, loss)
             loss_d = None
 
         if loss is not None:
@@ -111,12 +116,91 @@ class GANInterface(ModelInterface, abc.ABC):
         return { "loss_g": loss_g, "loss_d": loss_d, "loss": loss}
 
     @abc.abstractmethod
-    def _update_discriminator(self, fake_pred, real_pred):
+    def _discriminator_gan_loss(self, fake_pred, real_pred):
         pass
 
     @abc.abstractmethod
-    def _update_generator(self, fake_pred, extra_loss):
+    def _generator_gan_loss(self, fake_pred, real_pred):
         pass
+
+    def _update_discriminator(self, fake_pred, real_pred):
+        loss_d = self._discriminator_gan_loss(fake_pred, real_pred)
+        self.opt_d.zero_grad()
+        loss_d.backward()
+        self.opt_d.step()
+        return loss_d.item()
+
+    def _update_generator(self, fake_pred, real_pred, extra_loss):
+        loss_g = self._generator_gan_loss(fake_pred, real_pred)
+
+        if self.loss_scale is not None:
+            total_loss = loss_g * self.loss_scale
+        else:
+            total_loss = loss_g
+
+        if extra_loss is not None:
+            total_loss = total_loss + extra_loss
+
+        self.opt_g.zero_grad()
+        total_loss.backward()
+        self.opt_g.step()
+
+        return loss_g.item()
+
+
+class SGANInterface(GANInterface):
+    """Standard GAN interface [Goodfellow2014]."""
+    def __init__(self, *args, **kwargs):
+        super(SGANInterface, self).__init__(*args, **kwargs)
+        self.cross_entropy = th.nn.BCEWithLogitsLoss()
+
+    def _discriminator_gan_loss(self, fake_pred, real_pred):
+        real_loss = self.cross_entropy(real_pred, th.ones_like(real_pred))
+        fake_loss = self.cross_entropy(fake_pred, th.zeros_like(fake_pred))
+        loss_d = 0.5*(fake_loss + real_loss)
+        return loss_d
+
+    def _generator_gan_loss(self, fake_pred, real_pred):
+        loss_g = self.cross_entropy(fake_pred, th.ones_like(fake_pred))
+        return loss_g
+
+
+class RGANInterface(SGANInterface):
+    """Relativistic GAN interface [Jolicoeur-Martineau2018].
+
+    https://arxiv.org/abs/1807.00734
+
+    """
+    def _discriminator_gan_loss(self, fake_pred, real_pred):
+        loss_d = self.cross_entropy(real_pred-fake_pred, th.ones_like(real_pred))
+        return loss_d
+
+    def _generator_gan_loss(self, fake_pred, real_pred):
+        loss_g = self.cross_entropy(fake_pred-real_pred, th.ones_like(fake_pred))
+        return loss_g
+
+
+class RaGANInterface(SGANInterface):
+    """Relativistic average GAN interface [Jolicoeur-Martineau2018].
+
+    https://arxiv.org/abs/1807.00734
+
+    """
+    def _discriminator_gan_loss(self, fake_pred, real_pred):
+        loss_real = self.cross_entropy(
+            real_pred-fake_pred.mean(), th.ones_like(real_pred))
+        loss_fake = self.cross_entropy(
+            fake_pred-real_pred.mean(), th.zeros_like(fake_pred))
+        loss_d = 0.5*(loss_real + loss_fake)
+        return loss_d
+
+    def _generator_gan_loss(self, fake_pred, real_pred):
+        loss_real = self.cross_entropy(
+            real_pred-fake_pred.mean(), th.zeros_like(real_pred))
+        loss_fake = self.cross_entropy(
+            fake_pred-real_pred.mean(), th.ones_like(fake_pred))
+        loss_g = 0.5*(loss_real + loss_fake)
+        return loss_g
 
 
 class LSGANInterface(GANInterface):
@@ -127,31 +211,40 @@ class LSGANInterface(GANInterface):
         super(LSGANInterface, self).__init__(*args, **kwargs)
         self.mse = th.nn.MSELoss()
 
-    def _update_discriminator(self, fake_pred, real_pred):
+    def _discriminator_gan_loss(self, fake_pred, real_pred):
         fake_loss = self.mse(fake_pred, th.zeros_like(fake_pred))
         real_loss = self.mse(real_pred, th.ones_like(real_pred))
         loss_d = 0.5*(fake_loss + real_loss)
-        self.opt_d.zero_grad()
-        loss_d.backward()
-        self.opt_d.step()
-        return loss_d.item()
+        return loss_d
 
-    def _update_generator(self, fake_pred, extra_loss):
+    def _generator_gan_loss(self, fake_pred, real_pred):
         loss_g = self.mse(fake_pred, th.ones_like(fake_pred))
-        if self.loss_scale is not None:
-            loss_g *= self.loss_scale
-        if extra_loss is not None:
-            loss_g = loss_g + extra_loss
-        self.opt_g.zero_grad()
-        loss_g.backward()
+        return loss_g
 
-        clip = 1
-        actual = th.nn.utils.clip_grad_norm_(self.gen.parameters(), clip)
-        if actual > clip:
-          LOG.info("clipped gradients {} -> {}".format(clip, actual))
 
-        self.opt_g.step()
-        return loss_g.item()
+class RaLSGANInterface(LSGANInterface):
+    """Relativistic average Least-squares GAN interface [Jolicoeur-Martineau2018].
+
+    https://arxiv.org/abs/1807.00734
+
+    """
+    def _discriminator_gan_loss(self, fake_pred, real_pred):
+        # NOTE: -1, 1 targets
+        loss_real = self.mse(
+            real_pred-fake_pred.mean(), th.ones_like(real_pred))
+        loss_fake = self.mse(
+            fake_pred-real_pred.mean(), -th.ones_like(fake_pred))
+        loss_d = 0.5*(loss_real + loss_fake)
+        return loss_d
+
+    def _generator_gan_loss(self, fake_pred, real_pred):
+        # NOTE: -1, 1 targets
+        loss_real = self.mse(
+            real_pred-fake_pred.mean(), -th.ones_like(real_pred))
+        loss_fake = self.mse(
+            fake_pred-real_pred.mean(), th.ones_like(fake_pred))
+        loss_g = 0.5*(loss_real + loss_fake)
+        return loss_g
 
 
 class WGANInterface(GANInterface):
@@ -162,31 +255,26 @@ class WGANInterface(GANInterface):
                    of the discriminator.
     """
     def __init__(self, gen, discrim, lr=1e-4, c=0.1, ncritic=5, opt="rmsprop"):
-        super(WGANInterface, self).__init__(gen, discrim, lr=lr, ncritic=ncritic, opt=opt)
+        super(WGANInterface, self).__init__(
+            gen, discrim, lr=lr, ncritic=ncritic, opt=opt)
         assert c > 0, "clipping param should be positive."
         self.c = c
 
-    def _update_discriminator(self, fake_pred, real_pred):
+    def _discriminator_gan_loss(self, fake_pred, real_pred):
         # minus sign for gradient ascent
         loss_d = - (real_pred.mean() - fake_pred.mean())
+        return loss_d
 
-        self.opt_d.zero_grad()
-        loss_d.backward()
-        self.opt_d.step()
+    def _update_discriminator(self, fake_pred, real_pred):
+        loss_d_scalar = super(WGANInterface, self)._update_discriminator(
+            fake_pred, real_pred)
 
         # Clip discriminator parameters to enforce Lipschitz constraint
         for p in self.discrim.parameters():
             p.data.clamp_(-self.c, self.c)
 
-        return loss_d.item()
+        return loss_d_scalar
 
-    def _update_generator(self, fake_pred, extra_loss):
+    def _generator_gan_loss(self, fake_pred, real_pred):
         loss_g = -fake_pred.mean()
-        if self.loss_scale is not None:
-            loss_g *= self.loss_scale
-        if extra_loss is not None:
-            loss_g = loss_g + loss
-        self.opt_g.zero_grad()
-        loss_g.backward()
-        self.opt_g.step()
-        return loss_g.item()
+        return loss_g
