@@ -275,7 +275,7 @@ class ResidualChain(nn.Module):
     def __init__(self, n_features, ksize=3, depth=3, convs_per_block=2,
                  activation="relu", norm_layer=None):
         super(ResidualChain, self).__init__()
-        LOG.warn("ResidualChain has not been tested, beware!")
+        LOG.warning("ResidualChain has not been tested, beware!")
 
         assert isinstance(
             n_features, int) and n_features > 0, "Number of feature channels should be a positive integer"

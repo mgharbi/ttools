@@ -2,8 +2,6 @@
 import numpy as np
 import torch as th
 
-from .downsampling import Downsample
-
 def crop_like(src, tgt):
     """Crop a source image to match the spatial dimensions of a target.
 

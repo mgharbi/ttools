@@ -15,6 +15,9 @@ with open("README.rst", "r") as fh:
 
 packages = setuptools.find_packages(exclude=["tests"])
 
+docs_require = ["sphinx"]
+tests_require = ["pytest"]
+
 setuptools.setup(
     name="torch-tools",
     version=__version__,
@@ -42,4 +45,9 @@ setuptools.setup(
         "Operating System :: MacOS :: MacOS X",
         "Operating System :: POSIX",
     ],
+    extras_require={
+        "docs": docs_require,
+        "tests": tests_require,
+        "dev": docs_require + tests_require,
+    }
 )
