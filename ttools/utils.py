@@ -116,7 +116,7 @@ def tensor2image(t, normalize=False):
     assert bs == 1, "expected batch_size 1 tensor, got %d" % bs
     t = t.squeeze(0)
 
-    assert c == 3, "expected tensor with 3 channels, got %d" % c
+    assert c == 3 or c == 1, "expected tensor with 1 or 3 channels, got %d" % c
 
     if normalize:
         m = t.min()

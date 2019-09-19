@@ -1,8 +1,7 @@
 0.0.4
 -----
 
-- Adds GAN interfaces (todo: tests)
-- Adds GAN examples (todo)
+- Adds GAN interfaces
 
 0.0.3
 -----
