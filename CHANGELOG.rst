@@ -1,3 +1,9 @@
+0.0.5
+-----
+
+- Bug fixes in Tensorboard Callbacks
+- Fixes a bug in the UNet channel counts with non-integral "increase_factor".
+
 0.0.4
 -----
 
