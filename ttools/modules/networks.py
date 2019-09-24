@@ -313,7 +313,7 @@ class UNet(nn.Module):
       norm_layer(str): normalization to apply between the convolution modules.
     """
     def _width(self, lvl):
-        return min(self.base_width*self.increase_factor**(lvl), self.max_width)
+        return int(min(self.base_width*self.increase_factor**(lvl), self.max_width))
 
     def __init__(self, n_in, n_out, ksize=3, base_width=64, max_width=512, increase_factor=2,
                  num_convs=1, num_levels=4, activation="relu", norm_layer=None,
