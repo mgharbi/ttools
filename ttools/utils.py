@@ -101,7 +101,7 @@ class Averager(object):
         self.counts[key] += count
 
 
-def tensor2image(t, normalize=False):
+def tensor2image(t, normalize=False, dtype=np.uint8):
     """Converts an tensor image (4D tensor) to a numpy 8-bit array.
     Args:
         t(th.Tensor): input tensor with dimensions [bs, c, h, w], c=3, bs=1
@@ -124,9 +124,14 @@ def tensor2image(t, normalize=False):
         t = (t-m) / (M-m+1e-8)
 
 
-    t = th.clamp(t.permute(1, 2, 0), 0, 1).cpu().detach().numpy()*255.0
+    t = th.clamp(t.permute(1, 2, 0), 0, 1).cpu().detach().numpy()
 
-    return t.astype(np.uint8)
+    if dtype == np.uint8:
+        return (255.0*t).astype(np.uint8)
+    elif dtype == np.uint16:
+        return ((2**16-1)*t).astype(np.uint16)
+    else:
+        raise ValueError("dtype %s not recognized" % dtype)
 
 
 class Timer(object):

@@ -85,6 +85,59 @@ class PerceptualLoss(th.nn.Module):
             return feats
 
 
+class LedigPerceptualLoss(th.nn.Module):
+    """Perceptual loss as defined by [Ledig2017] in 'Photo-Realistic Single
+    Image Super-Resolution Using a Generative Adversarial Network'
+    """
+    def __init__(self, features="54"):
+        super(LedigPerceptualLoss, self).__init__()
+        if features not in ["54", "22"]:
+            raise ValueError("Valid features extracted for Ledig's VGG loss are '54' and '22', got %s", features)
+        self.feature_extractor = LedigPerceptualLoss._FeatureExtractor(features)
+        self.mse = th.nn.MSELoss()
+
+    def forward(self, out, ref):
+        out_f = self.feature_extractor(out)
+        ref_f = self.feature_extractor(ref.detach())
+
+        scores = []
+        for idx, (o_f, r_f) in enumerate(zip(out_f, ref_f)):
+            scores.append(self.mse(o_f, r_f))
+        return sum(scores)
+
+    class _FeatureExtractor(th.nn.Module):
+        def __init__(self, features):
+            super(LedigPerceptualLoss._FeatureExtractor, self).__init__()
+            vgg_pretrained = models.vgg19(pretrained=True).features
+            if features == "54":
+                breakpoints = [0, 34]  # 4th conv before pool5, pre-activation
+            elif features == "22":
+                breakpoints = [0, 7]  # 2nd conv before pool2, pre activation
+            else:
+                raise ValueError("Incorrect features to exactra '%s', should be '54' or '22'.")
+
+            for i, b in enumerate(breakpoints[:-1]):
+                ops = th.nn.Sequential()
+                for idx in range(b, breakpoints[i+1]):
+                    op = vgg_pretrained[idx]
+                    ops.add_module(str(idx), op)
+                self.add_module("group{}".format(i), ops)
+
+            for p in self.parameters():
+                p.requires_grad = False
+
+            self.register_buffer("shift", th.Tensor([-0.030, -0.088, -0.188]).view(1, 3, 1, 1))
+            self.register_buffer("scale", th.Tensor([0.458, 0.448, 0.450]).view(1, 3, 1, 1))
+
+        def forward(self, x):
+            feats = []
+            x = (x-self.shift) / self.scale
+            for m in self.children():
+                x = m(x)
+                feats.append(x)
+            return feats
+
+
 # import torch.nn as nn
 # import torch.nn.functional as F
 # import numpy as np
