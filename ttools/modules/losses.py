@@ -89,43 +89,56 @@ class TotalVariation(th.nn.Module):
 
 
 class LPIPS(th.nn.Module):
-    def __init__(self): 
+    def __init__(self, pre_relu=True): 
+        """
+        Args:
+            pre_relu(bool): if True, selects features **before** reLU activations
+        """
         super(LPIPS, self).__init__()
          # VGG using perceptually-learned weights (LPIPS metric)
+        self.pre_relu = pre_relu
         LOG.warning("LPIPS is untested")
 
         self.feature_extractor = LPIPS._FeatureExtractor()
 
-    def _normalize(self, x):
-        # Network assumes inputs are in [-1, 1]
-        return 2.0 * x  - 1.0
+    def _l2_normalize_features(self, x, eps=1e-10):
+        nrm = th.sqrt(th.sum(x*x, dim=1, keepdim=True))
+        return x / (nrm + eps)
 
     def forward(self, pred, target):
         """ """
 
         # Get VGG features
-        pred = self.feature_extractor(self._normalize(pred))
-        target = self.feature_extractor(self._normalize(target))
+        pred = self.feature_extractor(pred)
+        target = self.feature_extractor(target)
 
-        # TODO: L2 normalize features?
+        # L2 normalize features
+        pred = [self._l2_normalize_features(f) for f in pred]
+        target = [self._l2_normalize_features(f) for f in target]
+
 
         # TODO(mgharbi) Apply Richard's linear weights?
 
-        diffs = [th.nn.functional.mse_loss(p, t) for (p, t) in zip(pred, target)]
+        diffs = [th.sum((p-t)**2, 1) for (p, t) in zip(pred, target)]
 
-        return sum(diffs)
+        # Spatial average
+        diffs = [diff.mean([1, 2]) for diff in diffs]
+
+        return sum(diffs).mean(0)
 
     class _FeatureExtractor(th.nn.Module):
         def __init__(self):
             super(LPIPS._FeatureExtractor, self).__init__()
             vgg_pretrained = models.vgg16(pretrained=True).features
 
-            breakpoints = [0, 4, 9, 16, 23, 30]
+            self.breakpoints = [0, 4, 9, 16, 23, 30]
+            for i, _ in enumerate(self.breakpoints[1:]):
+                self.breakpoints[i+1] -= 1
 
             # Split at the maxpools
-            for i, b in enumerate(breakpoints[:-1]):
+            for i, b in enumerate(self.breakpoints[:-1]):
                 ops = th.nn.Sequential()
-                for idx in range(b, breakpoints[i+1]):
+                for idx in range(b, self.breakpoints[i+1]):
                     op = vgg_pretrained[idx]
                     ops.add_module(str(idx), op)
                 self.add_module("group{}".format(i), ops)
@@ -134,28 +147,26 @@ class LPIPS(th.nn.Module):
             for p in self.parameters():
                 p.requires_grad = False
 
+            # Torchvision's normalization: <https://github.com/pytorch/examples/blob/42e5b996718797e45c46a25c55b031e6768f8440/imagenet/main.py#L89-L101>
             self.register_buffer("shift", th.Tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1))
             self.register_buffer("scale", th.Tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1))
-
-        # Richard's
-        # self.register_buffer('shift', torch.Tensor([-.030,-.088,-.188])[None,:,None,None])
-        # self.register_buffer('scale', torch.Tensor([.458,.448,.450])[None,:,None,None])
 
         def forward(self, x):
             feats = []
             x = (x-self.shift) / self.scale
-            for m in self.children():
+            for idx in range(len(self.breakpoints)-1):
+                m = getattr(self, "group{}".format(idx))
                 x = m(x)
                 feats.append(x)
             return feats
 
 
 class ELPIPS(th.nn.Module):
-    def __init__(self, max_shift=16, nsamples=1):
+    def __init__(self, pre_relu=True, max_shift=16, nsamples=1):
         """Ensemble of LPIPS."""
         super(ELPIPS, self).__init__()
         self.max_shift= max_shift
-        self.ploss = LPIPS()
+        self.ploss = LPIPS(pre_relu=pre_relu)
         self.nsamples = nsamples
         LOG.warning("E-LPIPS is untested")
 
