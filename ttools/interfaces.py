@@ -25,12 +25,15 @@ class GANInterface(ModelInterface, abc.ABC):
     """
 
     def __init__(self, gen, discrim, lr=1e-4, ncritic=1, opt="rmsprop",
-                 cuda=th.cuda.is_available(), loss_scale=None):
+                 cuda=th.cuda.is_available(), gan_weight=None):
         super(GANInterface, self).__init__()
         self.gen = gen
         self.discrim = discrim
         self.ncritic = ncritic
-        self.loss_scale = loss_scale
+        self.gan_weight = gan_weight
+
+        if self.gan_weight == 0:  # do not account for discriminator
+            LOG.warning("GAN interface %s has gan_weight==0", self.__class__.__name__)
 
         self.iter = 0
 
@@ -125,18 +128,32 @@ class GANInterface(ModelInterface, abc.ABC):
 
     def _update_discriminator(self, fake_pred, real_pred):
         loss_d = self._discriminator_gan_loss(fake_pred, real_pred)
+
+        if self.gan_weight is not None:
+            total_loss = loss_d * self.gan_weight
+            if self.gan_weight == 0:  # do not update discriminator
+                return 0.0
+        else:
+            total_loss = loss_d
+
         self.opt_d.zero_grad()
-        loss_d.backward()
+        total_loss.backward()
         self.opt_d.step()
         return loss_d.item()
 
     def _update_generator(self, fake_pred, real_pred, extra_loss):
         loss_g = self._generator_gan_loss(fake_pred, real_pred)
 
-        if self.loss_scale is not None:
-            total_loss = loss_g * self.loss_scale
+        if self.gan_weight is not None:
+            if self.gan_weight == 0:  # do not account for discriminator
+                total_loss = 0.0
+                loss_g = 0.0
+            else:
+                total_loss = loss_g * self.gan_weight
+                loss_g = loss_g.item()
         else:
             total_loss = loss_g
+            loss_g = loss_g.item()
 
         if extra_loss is not None:
             total_loss = total_loss + extra_loss
@@ -145,7 +162,7 @@ class GANInterface(ModelInterface, abc.ABC):
         total_loss.backward()
         self.opt_g.step()
 
-        return loss_g.item()
+        return loss_g
 
 
 class SGANInterface(GANInterface):
