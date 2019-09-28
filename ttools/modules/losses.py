@@ -17,80 +17,13 @@ class PSNR(th.nn.Module):
         return -10*th.log10(mse+1e-12)
 
 
-class PerceptualLoss(th.nn.Module):
-    def __init__(self, pretrained=True, n_in=3, normalize=False):
-        super(PerceptualLoss, self).__init__()
-        self.feature_extractor = PerceptualLoss._FeatureExtractor(pretrained, n_in)
-        self.mse = th.nn.MSELoss()
-
-        self.normalize = normalize
-
-    def forward(self, out, ref):
-        out_f = self.feature_extractor(out)
-        ref_f = self.feature_extractor(ref)
-
-        scores = []
-        for idx, (o_f, r_f) in enumerate(zip(out_f, ref_f)):
-            scores.append(self._cos_sim(o_f, r_f))
-        return sum(scores)
-
-    def _normalize(self, a, eps=1e-10):
-        nrm = th.sum(a*a, 1, keepdim=True)
-        return a / th.sqrt(a + eps)
-
-    def _cos_sim(self, a, b):
-        # ||a-b||^2 = ||a||^2 + ||b||^2 - 2<a|b>, with ||a|| = ||b|| = 1
-        if self.normalize:
-            return self.mse(self._normalize(a), self._normalize(b))*0.5
-        else:
-            return self.mse(a, b)*0.5
-
-    class _FeatureExtractor(th.nn.Module):
-        def __init__(self, pretrained, n_in):
-            super(PerceptualLoss._FeatureExtractor, self).__init__()
-            self.pretrained = pretrained
-            if pretrained:
-                assert n_in == 3, "pretrained VGG feature extractor expects 3-channel input"
-            vgg_pretrained = models.vgg16(pretrained=pretrained).features
-            # breakpoints = [0, 4, 9, 16, 23, 30]
-            breakpoints = [0, 3]
-            for i, b in enumerate(breakpoints[:-1]):
-                ops = th.nn.Sequential()
-                for idx in range(b, breakpoints[i+1]):
-                    if idx == 0 and n_in != 3:
-                        LOG.error("input does not have 3 channels, using custom conv")
-                        raise ValueError()
-                        # ops.add_module(str(idx), th.nn.Conv2d(n_in, 64, 3, padding=1))
-                    else:
-                        op = vgg_pretrained[idx]
-                        # TODO(mgharbi): remove invalid boundaries
-                        if hasattr(op, 'padding'):
-                            op.padding = (0, 0)
-                        ops.add_module(str(idx), op)
-                self.add_module("group{}".format(i), ops)
-
-            for p in self.parameters():
-                p.requires_grad = False
-
-            self.register_buffer("shift", th.Tensor([-0.030, -0.088, -0.188]).view(1, 3, 1, 1))
-            self.register_buffer("scale", th.Tensor([0.458, 0.448, 0.450]).view(1, 3, 1, 1))
-
-        def forward(self, x):
-            feats = []
-            if self.pretrained:
-                x = (x-self.shift) / self.scale
-            for m in self.children():
-                x = m(x)
-                feats.append(x)
-            return feats
-
-
 class LedigPerceptualLoss(th.nn.Module):
     """Perceptual loss as defined by [Ledig2017] in 'Photo-Realistic Single
     Image Super-Resolution Using a Generative Adversarial Network'
     """
     def __init__(self, features="54"):
         super(LedigPerceptualLoss, self).__init__()
+        LOG.warning("LedigPerceptualLoss is untested")
         if features not in ["54", "22"]:
             raise ValueError("Valid features extracted for Ledig's VGG loss are '54' and '22', got %s", features)
         self.feature_extractor = LedigPerceptualLoss._FeatureExtractor(features)
@@ -98,7 +31,7 @@ class LedigPerceptualLoss(th.nn.Module):
 
     def forward(self, out, ref):
         out_f = self.feature_extractor(out)
-        ref_f = self.feature_extractor(ref.detach())
+        ref_f = self.feature_extractor(ref)
 
         scores = []
         for idx, (o_f, r_f) in enumerate(zip(out_f, ref_f)):
@@ -110,9 +43,9 @@ class LedigPerceptualLoss(th.nn.Module):
             super(LedigPerceptualLoss._FeatureExtractor, self).__init__()
             vgg_pretrained = models.vgg19(pretrained=True).features
             if features == "54":
-                breakpoints = [0, 34]  # 4th conv before pool5, pre-activation
+                breakpoints = [0, 35]  # 4th conv before pool5, pre-activation
             elif features == "22":
-                breakpoints = [0, 7]  # 2nd conv before pool2, pre activation
+                breakpoints = [0, 8]  # 2nd conv before pool2, pre activation
             else:
                 raise ValueError("Incorrect features to exactra '%s', should be '54' or '22'.")
 
@@ -126,8 +59,9 @@ class LedigPerceptualLoss(th.nn.Module):
             for p in self.parameters():
                 p.requires_grad = False
 
-            self.register_buffer("shift", th.Tensor([-0.030, -0.088, -0.188]).view(1, 3, 1, 1))
-            self.register_buffer("scale", th.Tensor([0.458, 0.448, 0.450]).view(1, 3, 1, 1))
+            self.register_buffer("shift", th.Tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1))
+            self.register_buffer("scale", th.Tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1))
+
 
         def forward(self, x):
             feats = []
@@ -138,89 +72,118 @@ class LedigPerceptualLoss(th.nn.Module):
             return feats
 
 
-# import torch.nn as nn
-# import torch.nn.functional as F
-# import numpy as np
-# from torch.autograd import Variable
-# from math import exp
+class TotalVariation(th.nn.Module):
+    def __init__(self):
+        LOG.warning("Total Variation loss is untested")
+        super(TotalVariation, self).__init__()
+
+    def _dx(self, tensor):
+        return tensor[..., 1:] - tensor[..., :-1]
+
+    def _dy(self, tensor):
+        return tensor[..., 1:, :] - tensor[..., :-1, :]
+
+    def forward(self, tensor):
+        return th.abs(self._dx(tensor)).mean() + th.abs(self._dy(tensor)).mean()
+
+
+class LPIPS(th.nn.Module):
+    def __init__(self): 
+        super(LPIPS, self).__init__()
+         # VGG using perceptually-learned weights (LPIPS metric)
+
+        self.feature_extractor = LPIPS._FeatureExtractor()
+
+    def _normalize(self, x):
+        # Network assumes inputs are in [-1, 1]
+        return 2.0 * x  - 1.0
+
+    def forward(self, pred, target):
+        """ """
+
+        # Get VGG features
+        pred = self.feature_extractor(self._normalize(pred))
+        target = self.feature_extractor(self._normalize(target))
+
+        # TODO: L2 normalize features?
+
+        # TODO(mgharbi) Apply Richard's linear weights?
+
+        diffs = [th.nn.functional.mse_loss(p, t) for (p, t) in zip(pred, target)]
+
+        return sum(diffs)
+
+    class _FeatureExtractor(th.nn.Module):
+        def __init__(self):
+            super(LPIPS._FeatureExtractor, self).__init__()
+            vgg_pretrained = models.vgg16(pretrained=True).features
+
+            breakpoints = [0, 4, 9, 16, 23, 30]
+
+            # Split at the maxpools
+            for i, b in enumerate(breakpoints[:-1]):
+                ops = th.nn.Sequential()
+                for idx in range(b, breakpoints[i+1]):
+                    op = vgg_pretrained[idx]
+                    ops.add_module(str(idx), op)
+                self.add_module("group{}".format(i), ops)
+
+            # No gradients
+            for p in self.parameters():
+                p.requires_grad = False
+
+            self.register_buffer("shift", th.Tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1))
+            self.register_buffer("scale", th.Tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1))
+
+        # Richard's
+        # self.register_buffer('shift', torch.Tensor([-.030,-.088,-.188])[None,:,None,None])
+        # self.register_buffer('scale', torch.Tensor([.458,.448,.450])[None,:,None,None])
+
+        def forward(self, x):
+            feats = []
+            x = (x-self.shift) / self.scale
+            for m in self.children():
+                x = m(x)
+                feats.append(x)
+            return feats
+
+
+# class vgg16(torch.nn.Module):
+#     def __init__(self, requires_grad=False, pretrained=True):
+#         super(vgg16, self).__init__()
+#         vgg_pretrained_features = tv.vgg16(pretrained=pretrained).features
+#         self.slice1 = torch.nn.Sequential()
+#         self.slice2 = torch.nn.Sequential()
+#         self.slice3 = torch.nn.Sequential()
+#         self.slice4 = torch.nn.Sequential()
+#         self.slice5 = torch.nn.Sequential()
+#         self.N_slices = 5
+#         for x in range(4):
+#             self.slice1.add_module(str(x), vgg_pretrained_features[x])
+#         for x in range(4, 9):
+#             self.slice2.add_module(str(x), vgg_pretrained_features[x])
+#         for x in range(9, 16):
+#             self.slice3.add_module(str(x), vgg_pretrained_features[x])
+#         for x in range(16, 23):
+#             self.slice4.add_module(str(x), vgg_pretrained_features[x])
+#         for x in range(23, 30):
+#             self.slice5.add_module(str(x), vgg_pretrained_features[x])
+#         if not requires_grad:
+#             for param in self.parameters():
+#                 param.requires_grad = False
 #
-# def gaussian(window_size, sigma):
-#   gauss = th.Tensor([exp(-(x - window_size//2)**2/float(2*sigma**2)) for x in range(window_size)])
-#   return gauss/gauss.sum()
+#     def forward(self, X):
+#         h = self.slice1(X)
+#         h_relu1_2 = h
+#         h = self.slice2(h)
+#         h_relu2_2 = h
+#         h = self.slice3(h)
+#         h_relu3_3 = h
+#         h = self.slice4(h)
+#         h_relu4_3 = h
+#         h = self.slice5(h)
+#         h_relu5_3 = h
+#         vgg_outputs = namedtuple("VggOutputs", ['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3', 'relu5_3'])
+#         out = vgg_outputs(h_relu1_2, h_relu2_2, h_relu3_3, h_relu4_3, h_relu5_3)
 #
-# def create_window(window_size, sigma, channel):
-#   _1D_window = gaussian(window_size, sigma).unsqueeze(1)
-#   _2D_window = _1D_window.mm(_1D_window.t()).float().unsqueeze(0).unsqueeze(0)
-#   window = Variable(_2D_window.expand(channel, 1, window_size, window_size).contiguous())
-#   return window
-#
-# def _ssim(img1, img2, window, window_size, channel, size_average = True):
-#   mu1 = F.conv2d(img1, window, padding = window_size//2, groups = channel)
-#   mu2 = F.conv2d(img2, window, padding = window_size//2, groups = channel)
-#
-#   mu1_sq = mu1.pow(2)
-#   mu2_sq = mu2.pow(2)
-#   mu1_mu2 = mu1*mu2
-#
-#   sigma1_sq = F.conv2d(img1*img1, window, padding = window_size//2, groups = channel) - mu1_sq
-#   sigma2_sq = F.conv2d(img2*img2, window, padding = window_size//2, groups = channel) - mu2_sq
-#   sigma12 = F.conv2d(img1*img2, window, padding = window_size//2, groups = channel) - mu1_mu2
-#
-#   C1 = 0.01**2
-#   C2 = 0.03**2
-#
-#   ssim_map = ((2*mu1_mu2 + C1)*(2*sigma12 + C2))/((mu1_sq + mu2_sq + C1)*(sigma1_sq + sigma2_sq + C2))
-#
-#   if size_average:
-#     return ssim_map.mean()
-#   else:
-#     return ssim_map.mean(1).mean(1).mean(1)
-#
-#
-# class SSIM(nn.Module):
-#   def __init__(self, window_size = 11, sigma=1.5, size_average = True):
-#     super(SSIM, self).__init__()
-#     self.window_size = window_size
-#     self.size_average = size_average
-#     self.channel = 1
-#     self.sigma = sigma
-#     self.window = create_window(window_size, self.sigma, self.channel)
-#
-#   def forward(self, img1, img2):
-#     (_, channel, _, _) = img1.size()
-#
-#     if channel == self.channel and self.window.data.type() == img1.data.type():
-#       window = self.window
-#     else:
-#       window = create_window(self.window_size, self.sigma, channel)
-#       
-#       if img1.is_cuda:
-#           window = window.cuda(img1.get_device())
-#       window = window.type_as(img1)
-#       
-#       self.window = window
-#       self.channel = channel
-#
-#     return _ssim(img1, img2, window, self.window_size, channel, self.size_average)
-#
-# class MSSSIM(nn.Module):
-#   def __init__(self, window_size=11, sigmas=[0.5, 1, 2, 4, 8], size_average = True):
-#     super(MSSSIM, self).__init__()
-#     self.SSIMs = [SSIM(window_size, s, size_average=size_average) for s in sigmas]
-#
-#   def forward(self, img1, img2):
-#     loss = 1
-#     for s in self.SSIMs:
-#       loss *= s(img1, img2)
-#     return loss
-#
-#
-# def ssim(img1, img2, window_size = 11, sigma=1.5, size_average = True):
-#     (_, channel, _, _) = img1.size()
-#     window = create_window(window_size, sigma, channel)
-#     
-#     if img1.is_cuda:
-#         window = window.cuda(img1.get_device())
-#     window = window.type_as(img1)
-#     
-#     return _ssim(img1, img2, window, window_size, channel, size_average)
+#         return out
