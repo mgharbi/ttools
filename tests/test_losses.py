@@ -63,3 +63,23 @@ class TestLPIPS(unittest.TestCase):
 
         self.assertAlmostEqual(loss.item(), 0.0, 2)
         self.assertAlmostEqual(mse, 0.0, 3)
+
+
+class TestELPIPS(unittest.TestCase):
+    def test_elpips(self):
+        bs, c, h, w = 1, 3, 128, 128
+        th.manual_seed(0)
+        pred = th.rand(bs, c, h, w)
+        tgt = pred.clone()
+
+        loss_fn = losses.ELPIPS()
+
+        if th.cuda.is_available():
+            loss_fn.cuda()
+            pred = pred.cuda()
+            tgt = tgt.cuda()
+
+        loss = loss_fn(pred, tgt)
+        print("loss", loss.item())
+
+        self.assertAlmostEqual(loss.item(), 0.0)

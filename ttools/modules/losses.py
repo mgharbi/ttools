@@ -1,5 +1,6 @@
 """Collections of loss functions."""
 import torch as th
+import numpy as np
 
 import logging
 
@@ -91,6 +92,7 @@ class LPIPS(th.nn.Module):
     def __init__(self): 
         super(LPIPS, self).__init__()
          # VGG using perceptually-learned weights (LPIPS metric)
+        LOG.warning("LPIPS is untested")
 
         self.feature_extractor = LPIPS._FeatureExtractor()
 
@@ -148,42 +150,65 @@ class LPIPS(th.nn.Module):
             return feats
 
 
-# class vgg16(torch.nn.Module):
-#     def __init__(self, requires_grad=False, pretrained=True):
-#         super(vgg16, self).__init__()
-#         vgg_pretrained_features = tv.vgg16(pretrained=pretrained).features
-#         self.slice1 = torch.nn.Sequential()
-#         self.slice2 = torch.nn.Sequential()
-#         self.slice3 = torch.nn.Sequential()
-#         self.slice4 = torch.nn.Sequential()
-#         self.slice5 = torch.nn.Sequential()
-#         self.N_slices = 5
-#         for x in range(4):
-#             self.slice1.add_module(str(x), vgg_pretrained_features[x])
-#         for x in range(4, 9):
-#             self.slice2.add_module(str(x), vgg_pretrained_features[x])
-#         for x in range(9, 16):
-#             self.slice3.add_module(str(x), vgg_pretrained_features[x])
-#         for x in range(16, 23):
-#             self.slice4.add_module(str(x), vgg_pretrained_features[x])
-#         for x in range(23, 30):
-#             self.slice5.add_module(str(x), vgg_pretrained_features[x])
-#         if not requires_grad:
-#             for param in self.parameters():
-#                 param.requires_grad = False
-#
-#     def forward(self, X):
-#         h = self.slice1(X)
-#         h_relu1_2 = h
-#         h = self.slice2(h)
-#         h_relu2_2 = h
-#         h = self.slice3(h)
-#         h_relu3_3 = h
-#         h = self.slice4(h)
-#         h_relu4_3 = h
-#         h = self.slice5(h)
-#         h_relu5_3 = h
-#         vgg_outputs = namedtuple("VggOutputs", ['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3', 'relu5_3'])
-#         out = vgg_outputs(h_relu1_2, h_relu2_2, h_relu3_3, h_relu4_3, h_relu5_3)
-#
-#         return out
+class ELPIPS(th.nn.Module):
+    def __init__(self, max_shift=16, nsamples=1):
+        """Ensemble of LPIPS."""
+        super(ELPIPS, self).__init__()
+        self.max_shift= max_shift
+        self.ploss = LPIPS()
+        self.nsamples = nsamples
+        LOG.warning("E-LPIPS is untested")
+
+    def sample_xform(self):
+        shift = np.random.randint(0, self.max_shift, size=(2,))
+        color_scale = th.rand(size=(3,))
+        # TODO(mgharbi): Limit anistropic scaling
+        scale = th.pow(2.0, th.rand(size=(2,))*4.0 - 2.0)
+        scale[1] = scale[0]
+        channel_perm = np.random.permutation(3)
+        transpose = np.random.choice([True, False])
+        fliplr = np.random.choice([True, False])
+        flipud = np.random.choice([True, False])
+        return dict(shift=shift, color_scale=color_scale, scale=scale,
+                    channel_perm=channel_perm, transpose=transpose,
+                    fliplr=fliplr, flipud=flipud)
+
+    def xform(self, im, params):
+        scale = params["scale"]
+        im = th.nn.functional.interpolate(im, scale_factor=scale,
+                                          mode="bilinear")
+
+        shift = params["shift"]
+        im = im[..., shift[0]:, shift[1]:]
+
+        # flip
+        if params["fliplr"]:
+            im = th.flip(im, (3,))
+
+        if params["flipud"]:
+            im = th.flip(im, (2,))
+
+        # transpose
+        if params["transpose"]:
+            im = im.permute(0, 1, 3, 2)
+
+        # color permutation
+        channel_perm = params["channel_perm"]
+        im = im[:, channel_perm]
+
+        color_scale = params["color_scale"].view(1, 3, 1, 1).to(im.device)
+        im = im * color_scale
+
+        return im
+
+    def forward(self, a, b):
+        losses = []
+        for smp in range(self.nsamples):
+            p = self.sample_xform()
+            xa = self.xform(a, p)
+            xb = self.xform(b, p)
+            losses.append(self.ploss(xa, xb))
+        losses = th.stack(losses)
+        return losses.mean()
+
+
