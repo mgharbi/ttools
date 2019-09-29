@@ -1,3 +1,8 @@
+0.0.9
+-----
+
+- Cleanup GAN interface
+
 0.0.8
 -----
 

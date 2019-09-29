@@ -24,7 +24,7 @@ class GANInterface(ModelInterface, abc.ABC):
         cuda(bool): whether or not to use CUDA.
     """
     def __init__(self, gen, discrim, lr=1e-4, ncritic=1, opt="rmsprop",
-                 cuda=th.cuda.is_available(), gan_weight=None):
+                 cuda=th.cuda.is_available(), gan_weight=1.0):
         super(GANInterface, self).__init__()
         self.gen = gen
         self.discrim = discrim
@@ -171,12 +171,11 @@ class GANInterface(ModelInterface, abc.ABC):
 
         loss_d = self._discriminator_gan_loss(fake_pred, real_pred)
 
-        if self.gan_weight is not None:
-            total_loss = loss_d * self.gan_weight
-            if self.gan_weight == 0:  # do not update discriminator
-                return 0.0
-        else:
-            total_loss = loss_d
+        if self.gan_weight == 0:  # do not update discriminator
+            LOG.error("wrong optimization path for `gan_weight==0`")
+            raise RuntimeError("wrong optimization path for `gan_weight==0`")
+
+        total_loss = loss_d * self.gan_weight
 
         self.opt_d.zero_grad()
         total_loss.backward()
@@ -190,16 +189,12 @@ class GANInterface(ModelInterface, abc.ABC):
         """
         loss_g = self._generator_gan_loss(fake_pred, real_pred)
 
-        if self.gan_weight is not None:
-            if self.gan_weight == 0:  # do not use the discriminator
-                LOG.error("wrong optimization path for `gan_weight==0`")
-                raise RuntimeError("wrong optimization path for `gan_weight==0`")
+        if self.gan_weight == 0:  # do not use the discriminator
+            LOG.error("wrong optimization path for `gan_weight==0`")
+            raise RuntimeError("wrong optimization path for `gan_weight==0`")
 
-            total_loss = loss_g * self.gan_weight
-            loss_g = loss_g.item()
-        else:
-            total_loss = loss_g
-            loss_g = loss_g.item()
+        total_loss = loss_g * self.gan_weight
+        loss_g = loss_g.item()
 
         # We have non-GAN terms in the loss
         if extra_loss is not None:
