@@ -1,3 +1,8 @@
+0.0.8
+-----
+
+- Disable GAN when weight = 0
+
 0.0.7
 -----
 
