@@ -1,3 +1,13 @@
+0.0.7
+-----
+
+- Added LPIPS and ELPIPS perceptual losses to ttools/modules/losses.pyj:w
+
+0.0.6
+-----
+
+- Minor changes to the GAN interfaces
+
 0.0.5
 -----
 
