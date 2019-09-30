@@ -1,6 +1,9 @@
 """Utilities to preprocess data."""
 from . import get_logger
 
+import numpy as np
+import torch as th
+
 __all__ = ["extract_tiles"]
 
 LOG = get_logger(__name__)
@@ -11,7 +14,8 @@ def extract_tiles(im, tile_size=128, tile_stride=None,
     """Generator that extracts tiles from an image.
 
     Args:
-        im(np.array) with size [h, w, channels]: the image.
+        im(np.array with size [h, w, ...] or th.Tensor with
+            size [..., h, w]: the image.
         tile_size(int): size of the square tiles in pixel.
         tile_stride(int or None): if None, the tiles are
             non-overlapping, otherwise stride between tiles.
@@ -26,14 +30,23 @@ def extract_tiles(im, tile_size=128, tile_stride=None,
     if tile_stride is None:
         tile_stride = tile_size
 
-    if len(im.shape) != 3:
-        LOG.error("Incorrect image shape, expected 3 dimensions.")
+    extractor = None
+    if isinstance(im, np.ndarray):
+        extractor = lambda x, y: im[y:y+tile_size, x:x+tile_size]
+        h, w = im.shape[:2]
+    elif isinstance(im, th.Tensor):
+        extractor = lambda x, y: im[..., y:y+tile_size, x:x+tile_size]
+        h, w = im.shape[-2:]
+    else:
+        LOG.error("Unknown input type %s", im.__class__.__name__)
+        raise RuntimeError("Unknown input type %s" % im.__class__.__name__)
+
+    if len(im.shape) < 3:
+        LOG.error("Incorrect image shape, expected at least 3 dimensions.")
         raise ValueError("Incorrect image shape")
 
-    h, w, c = im.shape
-
     for y in range(0, h, tile_stride):
-        if y+tile_size >= h:
+        if y+tile_size > h:
             if drop_last:
                 break
             y = h - tile_size
@@ -41,11 +54,11 @@ def extract_tiles(im, tile_size=128, tile_stride=None,
                 break
 
         for x in range(0, w, tile_stride):
-            if x+tile_size >= w:
+            if x+tile_size > w:
                 if drop_last:
                     break
                 x = w - tile_size
                 if x < 0:  # Image is smaller than a tile
                     break
-            tile = im[y:y+tile_size, x:x+tile_size]
-            yield tile, (y, x)
+            tile = extractor(x, y)
+            yield tile, y, x

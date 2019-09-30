@@ -1,3 +1,8 @@
+0.0.10
+-----
+
+- Adds tile extractor for numpy array and torch tensors.
+
 0.0.9
 -----
 
