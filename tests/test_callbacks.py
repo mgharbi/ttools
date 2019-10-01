@@ -14,6 +14,7 @@ import torch as th
 
 from ttools.callbacks import *
 
+
 class TestLoggingCallback(unittest.TestCase):
     def setUp(self):
         self.loggername = ''.join(
