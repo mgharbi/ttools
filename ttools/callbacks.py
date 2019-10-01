@@ -242,10 +242,10 @@ class LoggingCallback(KeyedCallback):
             return
         self._step = 0
 
-        s = "{}.{} | ".format(self.epoch + 1, self.batch + 1)
+        s = "Step {}.{}".format(self.epoch + 1, self.batch + 1)
         for k in self.keys:
             value = bwd_data.get(k, -1.0)  # return -1 if the value is none
-            s += "{} = {:.2f} ".format(k, value)
+            s += " | {} = {:.2f}".format(k, value)
         self.__print(s)
 
         self._step += 1
