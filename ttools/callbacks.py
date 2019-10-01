@@ -574,7 +574,7 @@ class TensorBoardLoggingCallback(Callback):
 
     def validation_end(self, val_data):
         super(TensorBoardLoggingCallback, self).validation_end(val_data)
-        t = self.epoch + 1
+        t = self.datasize * (self.epoch+1)
         for k in self.val_keys:
             if self.summary_type == 'scalar':
                 self._val_writer.add_scalar(k, val_data[k], global_step=t)
