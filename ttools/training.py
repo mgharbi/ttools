@@ -412,6 +412,7 @@ class Checkpointer(object):
     @staticmethod
     def load_meta(root, prefix=None):
         """Fetch model metadata without touching the saved parameters."""
-        chkptr = Checkpointer(root, None, None, prefix=prefix)
+        chkptr = Checkpointer(root, model=None, meta=None, prefix=prefix)
+        print(chkptr.sorted_checkpoints())
         _, meta = chkptr.load_latest()
         return meta
