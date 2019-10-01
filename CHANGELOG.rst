@@ -4,6 +4,8 @@
 - Adds tile extractor for numpy array and torch tensors.
 - Fixes CheckpointingCallback: no longer delete end of epoch checkpoints by
   default according to `max_files`.
+- Adds error to ExperimentLoggerCallback and CSVLoggingCallback, not
+  implemented yet.
 
 0.0.9
 -----

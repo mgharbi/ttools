@@ -228,7 +228,8 @@ class LoggingCallback(KeyedCallback):
         super(LoggingCallback, self).validation_end(val_data)
         s = "Validation {} | ".format(self.epoch + 1)
         for k in self.keys:
-            s += "{} = {:.2f} ".format(k, val_data[k])
+            value = val_data.get(k, -1.0)  # return -1 if the value is none
+            s += "{} = {:.2f} ".format(k, value)
         self.__print(s)
         self.__unindent()
 
@@ -243,7 +244,8 @@ class LoggingCallback(KeyedCallback):
 
         s = "{}.{} | ".format(self.epoch + 1, self.batch + 1)
         for k in self.keys:
-            s += "{} = {:.2f} ".format(k, bwd_data[k])
+            value = bwd_data.get(k, -1.0)  # return -1 if the value is none
+            s += "{} = {:.2f} ".format(k, value)
         self.__print(s)
 
         self._step += 1
