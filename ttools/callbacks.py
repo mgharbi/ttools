@@ -50,11 +50,19 @@ class Callback(object):
         pass
 
     def epoch_start(self, epoch):
-        """Hook to execute code when a new epoch starts."""
+        """Hook to execute code when a new epoch starts.
+
+        Note: self.epoch is never incremented. Instead, it should be set by the
+        caller.
+        """
         self.epoch = epoch
 
     def epoch_end(self):
-        """Hook to execute code when an epoch ends."""
+        """Hook to execute code when an epoch ends.
+
+        Note: self.epoch is never incremented, but it is set externally in
+        `epoch_start`.
+        """
         pass
 
     def validation_start(self, dataloader):
@@ -301,21 +309,27 @@ class CheckpointingCallback(Callback):
 
     Args:
       checkpointer (Checkpointer): actual checkpointer responsible for the I/O.
-      start_epoch (int or None): index of the starting epoch (e.g. when resuming from a previous checkpoint).
-      interval (int, optional): minimum time in seconds between periodic checkpoints
-        (within an epoch). There is not periodic checkpoint if this value is None.
-      max_files (int, optional): maximum number of periodic checkpoints to keep on disk. Note:
-        epoch checkpoints are never discarded.
+      start_epoch (int or None): index of the starting epoch (e.g. when
+          resuming from a previous checkpoint).
+      interval (int, optional): minimum time in seconds between periodic
+          checkpoints (within an epoch). There is not periodic checkpoint if
+          this value is None.
+      max_files (int, optional): maximum number of periodic checkpoints to keep
+          on disk.
+      max_epochs (int, optional): maximum number of epoch checkpoints to keep
+          on disk.
     """
 
     PERIODIC_PREFIX = "periodic_"
     EPOCH_PREFIX = "epoch_"
 
-    def __init__(self, checkpointer, start_epoch=None, interval=600, max_files=5):
+    def __init__(self, checkpointer, start_epoch=None, interval=600,
+                 max_files=5, max_epochs=None):
         super(CheckpointingCallback, self).__init__()
         self.checkpointer = checkpointer
         self.interval = interval
         self.max_files = max_files
+        self.max_epochs = max_epochs
 
         self.last_checkpoint_time = time.time()
 
@@ -329,7 +343,6 @@ class CheckpointingCallback(Callback):
 
     def epoch_end(self):
         """Save a checkpoint at the end of each epoch."""
-
         super(CheckpointingCallback, self).epoch_end()
         path = "{}{}".format(CheckpointingCallback.EPOCH_PREFIX, self.epoch)
         self.checkpointer.save(path, extras=self.get_extras())
@@ -365,8 +378,6 @@ class CheckpointingCallback(Callback):
 
     def __purge_old_files(self):
         """Delete checkpoints that are beyond the max to keep."""
-        if self.max_files is None:
-            return
 
         chkpts = self.checkpointer.sorted_checkpoints()
         p_chkpts = []
@@ -378,14 +389,16 @@ class CheckpointingCallback(Callback):
             if c.startswith(self.checkpointer.prefix + CheckpointingCallback.EPOCH_PREFIX):
                 e_chkpts.append(c)
 
-        if len(p_chkpts) > self.max_files:
+        # Delete periodic checkpoints
+        if self.max_files is not None and len(p_chkpts) > self.max_files:
             for c in p_chkpts[self.max_files:]:
                 LOG.debug("CheckpointingCallback deleting {}".format(c))
                 self.checkpointer.delete(c)
 
-        if len(e_chkpts) > self.max_files:
-            for c in e_chkpts[self.max_files:]:
-                LOG.debug("CheckpointingCallback deleting {}".format(c))
+        # Delete older epochs
+        if self.max_epochs is not None and len(e_chkpts) > self.max_epochs:
+            for c in e_chkpts[self.max_epochs:]:
+                LOG.debug("CheckpointingCallback deleting (epoch) {}".format(c))
                 self.checkpointer.delete(c)
 
 

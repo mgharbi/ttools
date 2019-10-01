@@ -2,16 +2,15 @@ import os
 import shutil
 import tempfile
 import unittest
+import time
 
 import torch as th
 
 from ttools import Checkpointer
+from ttools.callbacks import CheckpointingCallback
 
 
 class TestCheckpointer(unittest.TestCase):
-
-    """Test case docstring."""
-
     def setUp(self):
         self.root = tempfile.mkdtemp()
 
@@ -78,3 +77,130 @@ class TestCheckpointer(unittest.TestCase):
     def test_save_gpu_and_load_cpu(self):
         # TODO(mgharbi)
         pass
+
+
+class TestCheckpointingCallback(unittest.TestCase):
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        self.root2 = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.root)
+        shutil.rmtree(self.root2)
+
+    def testPeriodicCheckpoints(self):
+        chkpt = Checkpointer(self.root)
+        interval = 0.5  # checkpoint every x seconds
+        cb = CheckpointingCallback(chkpt, max_files=10, max_epochs=None,
+                                   interval=interval)
+        chkpts = chkpt.sorted_checkpoints()
+        self.assertFalse(chkpts)  # check is empty
+
+        # Two batches in the interval
+        time.sleep(2*interval)
+        cb.batch_end(None, None, None)
+        time.sleep(2*interval)
+        cb.batch_end(None, None, None)
+
+        chkpts = chkpt.sorted_checkpoints()
+        self.assertEqual(len(chkpts), 2)
+
+    def testDisablePeriodicCheckpoints(self):
+        chkpt = Checkpointer(self.root)
+        cb = CheckpointingCallback(chkpt, max_files=10, max_epochs=None,
+                                   interval=None)
+        chkpts = chkpt.sorted_checkpoints()
+        self.assertFalse(chkpts)  # check is empty
+
+        # Two batches in the interval
+        time.sleep(1)
+        cb.batch_end(None, None, None)
+        time.sleep(1)
+        cb.batch_end(None, None, None)
+
+        # There should be no periodic checkpoints
+        chkpts = chkpt.sorted_checkpoints()
+        self.assertFalse(chkpts)
+
+    def testMaxCheckpoints(self):
+        chkpt = Checkpointer(self.root)
+        chkpt2 = Checkpointer(self.root2)
+        interval = 0.5  # checkpoint every x seconds
+        cb = CheckpointingCallback(chkpt, max_files=10, max_epochs=None,
+                                   interval=interval)
+        cb2 = CheckpointingCallback(chkpt2, max_files=1, max_epochs=None,
+                                   interval=interval)
+        chkpts = chkpt.sorted_checkpoints()
+        self.assertFalse(chkpts)  # check is empty
+
+        # Three batches in the interval
+        time.sleep(2*interval)
+        cb.batch_end(None, None, None)
+        cb2.batch_end(None, None, None)
+        time.sleep(2*interval)
+        cb.batch_end(None, None, None)
+        cb2.batch_end(None, None, None)
+        time.sleep(2*interval)
+        cb.batch_end(None, None, None)
+        cb2.batch_end(None, None, None)
+
+        # Make sure we have the right count in the comparison chkpt
+        chkpts = chkpt.sorted_checkpoints()
+        self.assertEqual(len(chkpts), 3)
+
+        # Make sure 2 is properly capped
+        chkpts = chkpt2.sorted_checkpoints()
+        self.assertEqual(len(chkpts), 1)
+
+
+    def testEpochCheckpoints(self):
+        chkpt = Checkpointer(self.root)
+        interval = 0.5  # checkpoint every x seconds
+        cb = CheckpointingCallback(chkpt, max_files=1, max_epochs=None,
+                                   interval=interval)
+        chkpts = chkpt.sorted_checkpoints()
+        self.assertFalse(chkpts)  # check is empty
+
+        # A few epoch have passed
+        for epoch in range(4):
+            cb.epoch_start(epoch)
+            cb.epoch_end()
+
+        time.sleep(1)
+
+        # Check we have the right checkpoint count
+        chkpts = chkpt.sorted_checkpoints()
+        self.assertEqual(len(chkpts), 4)
+
+
+    def testCappedEpochCheckpoints(self):
+        chkpt = Checkpointer(self.root)
+        chkpt2 = Checkpointer(self.root2)
+        interval = 0.5  # checkpoint every x seconds
+        cb = CheckpointingCallback(chkpt, max_files=1, max_epochs=None,
+                                   interval=interval)
+        interval = 0.5  # checkpoint every x seconds
+        cb2 = CheckpointingCallback(chkpt2, max_files=1, max_epochs=3,
+                                   interval=interval)
+
+        chkpts = chkpt.sorted_checkpoints()
+        self.assertFalse(chkpts)  # check is empty
+
+        chkpts = chkpt2.sorted_checkpoints()
+        self.assertFalse(chkpts)  # check is empty
+
+        # A few epoch have passed
+        for epoch in range(8):
+            cb.epoch_start(epoch)
+            cb.epoch_end()
+            cb2.epoch_start(epoch)
+            cb2.epoch_end()
+
+        time.sleep(1)
+
+        # Check we have the right checkpoint count
+        chkpts = chkpt.sorted_checkpoints()
+        self.assertEqual(len(chkpts), 8)
+
+        chkpts = chkpt2.sorted_checkpoints()
+        self.assertEqual(len(chkpts), 3)

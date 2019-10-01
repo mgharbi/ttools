@@ -61,8 +61,8 @@ class TestLPIPS(unittest.TestCase):
             opt.step()
             print("step", step, "loss", loss.item(), "mse", mse)
 
-        self.assertAlmostEqual(loss.item(), 0.0, 2)
-        self.assertAlmostEqual(mse, 0.0, 3)
+        self.assertAlmostEqual(loss.item(), 0.0, 3)
+        self.assertAlmostEqual(mse, 0.0, 2)
 
 
 class TestELPIPS(unittest.TestCase):
@@ -82,4 +82,4 @@ class TestELPIPS(unittest.TestCase):
         loss = loss_fn(pred, tgt)
         print("loss", loss.item())
 
-        self.assertAlmostEqual(loss.item(), 0.0)
+        self.assertAlmostEqual(loss.item(), 0.0, 2)
