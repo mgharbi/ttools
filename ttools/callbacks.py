@@ -469,6 +469,8 @@ class ExperimentLoggerCallback(Callback):
 
     def __init__(self, fname, meta=None):
         super(ExperimentLoggerCallback, self).__init__()
+        LOG.error("ExperimentLoggerCallback is not implemented yet")
+        raise NotImplementedError("ExperimentLoggerCallback is not implemented yet")
 
     def training_start(self, dataloader):
         super(ExperimentLoggerCallback, self).training_start(dataloader)
