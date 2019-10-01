@@ -490,11 +490,16 @@ class CSVLoggingCallback(KeyedCallback):
     """
     def __init__(self, fname, keys=None, val_keys=None, smoothing=0):
         super(CSVLoggingCallback, self).__init__(keys=keys, val_keys=val_keys, smoothing=smoothing)
+
+        LOG.error("CSVLoggingCallback is not implemented yet")
+        raise NotImplementedError("CSVLoggingCallback is not implemented yet")
+
         self.fname = fname
         self.fid = open(self.fname, 'w')
 
         self.fid.write("epoch, step, event, key, value\n")
         self.fid.write(",,logger_created,,\n")
+
 
         # open file, check last event
 
