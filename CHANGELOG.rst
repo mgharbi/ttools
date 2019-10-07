@@ -2,6 +2,7 @@
 -----
 
 - Bug fixes in Tensorboard logger
+- Allows debug to print np.ndarray in addition to th.Tensor
 
 0.0.10
 -----
