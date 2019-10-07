@@ -20,16 +20,14 @@ __all__ = ["ModelInterface", "Trainer", "Checkpointer", "BasicArgumentParser"]
 class BasicArgumentParser(argparse.ArgumentParser):
     """A basic argument parser with commonly used training options."""
 
-    def __init__(self):
-        super(BasicArgumentParser, self).__init__()
+    def __init__(self, *args, **kwargs):
+        super(BasicArgumentParser, self).__init__(*args, **kwargs)
 
         self.add_argument("--data", required=True, help="")
+        self.add_argument("--val_data", help="")
         self.add_argument("--checkpoint_dir", required=True,
                           help="Output directory where checkpoints are saved")
-
         self.add_argument("--init_from", help="path to a checkpoint from which to try and initialize the weights.")
-
-        self.add_argument("--val_data", help="")
 
         self.add_argument("--lr", type=float, default=1e-4,
                           help="Learning rate for the optimizer")
@@ -39,8 +37,8 @@ class BasicArgumentParser(argparse.ArgumentParser):
         self.add_argument("--num_worker_threads", default=4, type=int,
                           help="Number of threads that load data")
 
-        self.add_argument("--experiment_log",
-                          help="csv file in which we log our experiments")
+        # self.add_argument("--experiment_log",
+        #                   help="csv file in which we log our experiments")
 
         self.add_argument("--cuda", action="store_true",
                           dest="cuda", help="Force GPU")
@@ -50,6 +48,7 @@ class BasicArgumentParser(argparse.ArgumentParser):
         self.add_argument("--env", default="main", help="Visdom environment")
         self.add_argument("--port", default=8097, type=int,
                           help="Visdom server port")
+
         self.add_argument('--debug', dest="debug", action="store_true")
 
         self.set_defaults(cuda=th.cuda.is_available(), debug=False)

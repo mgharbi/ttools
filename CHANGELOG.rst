@@ -1,3 +1,8 @@
+0.0.11
+-----
+
+- Bug fixes in Tensorboard logger
+
 0.0.10
 -----
 

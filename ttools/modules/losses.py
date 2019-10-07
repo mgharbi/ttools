@@ -174,6 +174,7 @@ class ELPIPS(th.nn.Module):
         shift = np.random.randint(0, self.max_shift, size=(2,))
         color_scale = th.rand(size=(3,))
         # TODO(mgharbi): Limit anistropic scaling
+        # TODO(mgharbi): issue with lowpass in 
         scale = th.pow(2.0, th.rand(size=(2,))*4.0 - 2.0)
         scale[1] = scale[0]
         channel_perm = np.random.permutation(3)
