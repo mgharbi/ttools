@@ -4,6 +4,7 @@ import string
 import visdom
 
 import torch as th
+import numpy as np
 
 
 __all__ = ["tensor"]
@@ -19,7 +20,9 @@ def _win(name):
 
 
 def tensor(t, name):
-    if len(t.shape) != 4:
+    if isinstance(t, np.ndarray) and len(t.shape) == 3:
+        t = th.from_numpy(t).permute(2, 0, 1).unsqueeze(0)
+    elif len(t.shape) != 4:
         raise ValueError("Debug display needs 4D tensors")
     b, c, h, w = t.shape
     if c != 3:  # unroll channels
