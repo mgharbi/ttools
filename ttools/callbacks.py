@@ -120,6 +120,9 @@ class VisdomLoggingCallback(KeyedCallback):
       frequency(int): number of steps between display updates.
       port (int): Port of the Visdom server to log to.
       env (string): name of the Visdom environment to log to.
+      log (bool): if True, shows the data on a log-scale
+      smoothing(float): smoothing factor for the exponential moving average.
+        0.0 disables smoothing.
     """
 
     def __init__(self, keys=None, val_keys=None, frequency=100, port=8097,
