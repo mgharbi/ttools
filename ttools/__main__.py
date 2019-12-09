@@ -1,8 +1,9 @@
-#!/usr/bin/env python
+"""Executable entrypoints."""
 import argparse
 import imageio
 
-def im2video():
+
+def im2vid():
     parser = argparse.ArgumentParser(description="converts a series of image frames to a video.")
     parser.add_argument("images", nargs="+")
     parser.add_argument("output")
@@ -15,6 +16,3 @@ def im2video():
         print(".")
     print("saving video")
     imageio.mimsave(args.output, images)
-
-if __name__ == "__main__":
-    im2video()

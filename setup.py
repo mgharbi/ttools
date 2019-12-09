@@ -24,9 +24,15 @@ tests_require = ["pytest"]
 setuptools.setup(
     name="torch-tools",
     version=__version__,
-    scripts=[
-        "scripts/ttools.im2vid"
-    ],
+    # scripts=[
+    #     "scripts/ttools.im2vid"
+    # ],
+    entry_points={
+          'console_scripts': [
+              # 'ttools.im2vid = ttools.__main__:im2vid'
+              'ttools.im2vid = ttools.__main__:im2vid'
+          ]
+    },
     author="Michaël Gharbi",
     author_email="mgharbi@adobe.com",
     description="A library of helpers to train, evaluate and visualize deep nets with PyTorch.",
