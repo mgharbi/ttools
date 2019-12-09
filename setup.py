@@ -19,17 +19,11 @@ packages = setuptools.find_packages(exclude=["tests"])
 docs_require = ["sphinx"]
 tests_require = ["pytest"]
 
-# scripts = [os.path.join("scripts", f) for f in os.listdir("scripts")]
-
 setuptools.setup(
     name="torch-tools",
     version=__version__,
-    # scripts=[
-    #     "scripts/ttools.im2vid"
-    # ],
     entry_points={
           'console_scripts': [
-              # 'ttools.im2vid = ttools.__main__:im2vid'
               'ttools.im2vid = ttools.__main__:im2vid'
           ]
     },

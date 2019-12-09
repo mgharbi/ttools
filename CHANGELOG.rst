@@ -1,3 +1,8 @@
+0.0.13
+-----
+
+- update entrypoint build
+
 0.0.12
 -----
 
