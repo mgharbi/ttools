@@ -2,7 +2,7 @@
 import argparse
 import imageio
 
-if __name__ == "__main__":
+def im2video():
     parser = argparse.ArgumentParser(description="converts a series of image frames to a video.")
     parser.add_argument("images", nargs="+")
     parser.add_argument("output")
@@ -15,3 +15,6 @@ if __name__ == "__main__":
         print(".")
     print("saving video")
     imageio.mimsave(args.output, images)
+
+if __name__ == "__main__":
+    im2video()

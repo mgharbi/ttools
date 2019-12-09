@@ -19,12 +19,14 @@ packages = setuptools.find_packages(exclude=["tests"])
 docs_require = ["sphinx"]
 tests_require = ["pytest"]
 
-scripts = [os.path.join("scripts", f) for f in os.listdir("scripts")]
+# scripts = [os.path.join("scripts", f) for f in os.listdir("scripts")]
 
 setuptools.setup(
     name="torch-tools",
     version=__version__,
-    scripts=scripts,
+    scripts=[
+        "scripts/ttools.im2vid"
+    ],
     author="Michaël Gharbi",
     author_email="mgharbi@adobe.com",
     description="A library of helpers to train, evaluate and visualize deep nets with PyTorch.",
