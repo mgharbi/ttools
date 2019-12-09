@@ -1,4 +1,5 @@
 """Build and install script for ttools."""
+import os
 import re
 import setuptools
 
@@ -18,10 +19,12 @@ packages = setuptools.find_packages(exclude=["tests"])
 docs_require = ["sphinx"]
 tests_require = ["pytest"]
 
+scripts = [os.path.join("scripts", f) for f in os.listdir("scripts")]
+
 setuptools.setup(
     name="torch-tools",
     version=__version__,
-    scripts=[],
+    scripts=scripts,
     author="Michaël Gharbi",
     author_email="mgharbi@adobe.com",
     description="A library of helpers to train, evaluate and visualize deep nets with PyTorch.",
@@ -37,6 +40,8 @@ setuptools.setup(
         "torchvision",
         "coloredlogs",
         "visdom",
+        "imageio",
+        "imageio-ffmpeg",
     ],
     classifiers=[
         "Development Status :: 3 - Alpha",
