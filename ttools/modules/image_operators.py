@@ -70,6 +70,8 @@ class ImageGradients(th.nn.Module):
     self.dx.weight.requires_grad = False
     self.dy.weight.requires_grad = False
 
+    # Sobel filters
+
     self.dx.weight.data.zero_()
     self.dx.weight.data[:, :, 0, 0]  = -1
     self.dx.weight.data[:, :, 0, 2]  = 1
