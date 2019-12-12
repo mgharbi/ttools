@@ -23,8 +23,9 @@ class BasicArgumentParser(argparse.ArgumentParser):
     def __init__(self, *args, **kwargs):
         super(BasicArgumentParser, self).__init__(*args, **kwargs)
 
-        self.add_argument("--data", required=True, help="")
-        self.add_argument("--val_data", help="")
+        self.add_argument("--data", required=True, help="path to the training data.")
+        self.add_argument("--val_data", help="path to the validation data.")
+        self.add_argument("--config", help="path to a config file.")
         self.add_argument("--checkpoint_dir", required=True,
                           help="Output directory where checkpoints are saved")
         self.add_argument("--init_from", help="path to a checkpoint from which to try and initialize the weights.")

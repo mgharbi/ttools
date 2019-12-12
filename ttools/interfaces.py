@@ -31,30 +31,41 @@ class GANInterface(ModelInterface, abc.ABC):
         self.ncritic = ncritic
         self.gan_weight = gan_weight
 
-        if self.gan_weight == 0:  # do not use the discriminator
+        if self.gan_weight == 0:
             LOG.warning("GAN interface %s has gan_weight==0",
                         self.__class__.__name__)
+            self.discrim = None
 
+        if self.discrim is None:
+            LOG.warning("Using a GAN interface %s with no discriminator")
+
+        # number of discriminator iterations
         self.iter = 0
 
         self.cuda = cuda
         if cuda:
             self.gen.cuda()
-            self.discrim.cuda()
+            if discrim is not None:
+                self.discrim.cuda()
+
+        self.opt_d = None
 
         if opt == "sgd":
             self.opt_g = th.optim.SGD(gen.parameters(), lr=lr)
-            self.opt_d = th.optim.SGD(discrim.parameters(), lr=lr)
+            if self.discrim is not None:
+                self.opt_d = th.optim.SGD(discrim.parameters(), lr=lr)
         elif opt == "adam":
             LOG.warn("Using a momentum-based optimizer in the discriminator,"
                      " this can be problematic.")
             self.opt_g = th.optim.Adam(
                 gen.parameters(), lr=lr, betas=(0.5, 0.999))
-            self.opt_d = th.optim.Adam(
-                discrim.parameters(), lr=lr, betas=(0.5, 0.999))
+            if self.discrim is not None:
+                self.opt_d = th.optim.Adam(
+                    discrim.parameters(), lr=lr, betas=(0.5, 0.999))
         elif opt == "rmsprop":
             self.opt_g = th.optim.RMSprop(gen.parameters(), lr=lr)
-            self.opt_d = th.optim.RMSprop(discrim.parameters(), lr=lr)
+            if self.discrim is not None:
+                self.opt_d = th.optim.RMSprop(discrim.parameters(), lr=lr)
         else:
             raise ValueError("invalid optimizer %s" % opt)
 
@@ -93,6 +104,8 @@ class GANInterface(ModelInterface, abc.ABC):
             real_pred(th.Tensor): discriminator output for the real sample.
         Returns:
             th.Tensor: a scalar loss value.
+
+        Implement in derived classes.
         """
         pass
 
@@ -105,6 +118,8 @@ class GANInterface(ModelInterface, abc.ABC):
             real_pred(th.Tensor): discriminator output for the real sample.
         Returns:
             th.Tensor: a scalar loss value.
+
+        Implement in derived classes.
         """
         pass
 
@@ -113,26 +128,27 @@ class GANInterface(ModelInterface, abc.ABC):
         """Computes extra losses for the generator if needed.
 
         Returns:
-            th.Tensor with shape [1], the total extra loss.
+            None or th.Tensor with shape [1], the total extra loss.
         """
         return None
 
     def backward(self, batch, fwd_data):
         """Generic GAN backward step.
 
-        Alternates between n_critic discriminator updates and a single
-        generator update. Only uses `extra_generator_loss` as objective when
-        `gan_weight==0`.
+        Alternates between `n_critic` discriminator updates and a single
+        generator update. 
+        Only uses `extra_generator_loss` as objective when `gan_weight==0`.
         """
+
         loss = self._extra_generator_loss(batch, fwd_data)
 
-          # No discriminator needed, just use the extra losses
-        if self.gan_weight == 0:
+        # No discriminator needed, just use the extra losses
+        if self.discrim is None:
             if loss is None:
-                LOG.error("Training a GAN with `gan_weight==0` and no extra "
-                          "loss: nothing to backprop from!")
-                raise RuntimeError("Training a GAN with `gan_weight==0` and no"
-                                   " extra loss: nothing to backprop from!")
+                LOG.error("Training a GAN with no discriminator and no extra "
+                          "loss: nothing to optimize!")
+                raise RuntimeError("Training a GAN with no discriminator"
+                                   " and no extra loss: nothing to optimize!")
 
             # Update the generator with only the non-GAN losses
             self.opt_g.zero_grad()
@@ -141,15 +157,18 @@ class GANInterface(ModelInterface, abc.ABC):
 
             return { "loss_g": None, "loss_d": None, "loss": loss.item()}
 
+        # If we reach this point, we have a discriminator
+
+        loss_g = None
+        loss_d = None
         if self.iter < self.ncritic:  # Update discriminator
             # We detach the generated samples, so that no grads propagate to
-            # the generator here
+            # the generator here.
             fake_pred = self.discrim(
                 self._discriminator_input(batch, fwd_data, fake=True).detach())
             real_pred = self.discrim(
                 self._discriminator_input(batch, fwd_data, fake=False))
             loss_d = self._update_discriminator(fake_pred, real_pred)
-            loss_g = None
             self.iter += 1
         else:  # Update generator
             self.iter = 0
@@ -158,7 +177,6 @@ class GANInterface(ModelInterface, abc.ABC):
             real_pred_g = self.discrim(
                 self._discriminator_input(batch, fwd_data, fake=False))
             loss_g = self._update_generator(fake_pred_g, real_pred_g, loss)
-            loss_d = None
 
         if loss is not None:
             loss = loss.item()
@@ -171,15 +189,12 @@ class GANInterface(ModelInterface, abc.ABC):
 
         loss_d = self._discriminator_gan_loss(fake_pred, real_pred)
 
-        if self.gan_weight == 0:  # do not update discriminator
-            LOG.error("wrong optimization path for `gan_weight==0`")
-            raise RuntimeError("wrong optimization path for `gan_weight==0`")
-
         total_loss = loss_d * self.gan_weight
 
         self.opt_d.zero_grad()
         total_loss.backward()
         self.opt_d.step()
+
         return loss_d.item()
 
     def _update_generator(self, fake_pred, real_pred, extra_loss):
@@ -189,12 +204,7 @@ class GANInterface(ModelInterface, abc.ABC):
         """
         loss_g = self._generator_gan_loss(fake_pred, real_pred)
 
-        if self.gan_weight == 0:  # do not use the discriminator
-            LOG.error("wrong optimization path for `gan_weight==0`")
-            raise RuntimeError("wrong optimization path for `gan_weight==0`")
-
         total_loss = loss_g * self.gan_weight
-        loss_g = loss_g.item()
 
         # We have non-GAN terms in the loss
         if extra_loss is not None:
@@ -204,7 +214,7 @@ class GANInterface(ModelInterface, abc.ABC):
         total_loss.backward()
         self.opt_g.step()
 
-        return loss_g
+        return loss_g.item()
 
 
 class SGANInterface(GANInterface):
