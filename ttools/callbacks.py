@@ -330,7 +330,7 @@ class CheckpointingCallback(Callback):
     EPOCH_PREFIX = "epoch_"
 
     def __init__(self, checkpointer, start_epoch=None, interval=600,
-                 max_files=5, max_epochs=None):
+                 max_files=5, max_epochs=10):
         super(CheckpointingCallback, self).__init__()
         self.checkpointer = checkpointer
         self.interval = interval
