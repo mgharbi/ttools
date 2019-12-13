@@ -24,7 +24,8 @@ setuptools.setup(
     version=__version__,
     entry_points={
           'console_scripts': [
-              'ttools.im2vid = ttools.__main__:im2vid'
+              'ttools.im2vid = ttools.__main__:im2vid',
+              'ttools.resize = ttools.__main__:resize',
           ]
     },
     author="Michaël Gharbi",
