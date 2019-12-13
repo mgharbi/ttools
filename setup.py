@@ -43,6 +43,7 @@ setuptools.setup(
         "torchvision",
         "coloredlogs",
         "visdom",
+        "pyaml",
         "imageio",
         "imageio-ffmpeg",
     ],
