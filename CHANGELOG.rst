@@ -1,4 +1,11 @@
 0.0.13
+------
+
+- update GAN interfaces
+- adds .yml config parser
+- updates perceptual losses
+
+0.0.13
 -----
 
 - update entrypoint build

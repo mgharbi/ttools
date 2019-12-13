@@ -89,37 +89,42 @@ class TotalVariation(th.nn.Module):
 
 
 class LPIPS(th.nn.Module):
-    def __init__(self, pre_relu=True): 
+    def __init__(self, pretrained=True, normalize=True, pre_relu=True): 
         """
         Args:
             pre_relu(bool): if True, selects features **before** reLU activations
         """
         super(LPIPS, self).__init__()
          # VGG using perceptually-learned weights (LPIPS metric)
-        self.pre_relu = pre_relu
+        self.normalize = normalize
+        self.pretrained = pretrained
         LOG.warning("LPIPS is untested")
 
-        self.feature_extractor = LPIPS._FeatureExtractor()
+        self.feature_extractor = LPIPS._FeatureExtractor(pretrained, pre_relu)
 
     def _l2_normalize_features(self, x, eps=1e-10):
         nrm = th.sqrt(th.sum(x*x, dim=1, keepdim=True))
         return x / (nrm + eps)
 
     def forward(self, pred, target):
-        """ """
+        """Compare VGG features of two inputs."""
 
         # Get VGG features
         pred = self.feature_extractor(pred)
         target = self.feature_extractor(target)
 
         # L2 normalize features
-        pred = [self._l2_normalize_features(f) for f in pred]
-        target = [self._l2_normalize_features(f) for f in target]
-
+        if self.normalize:
+            pred = [self._l2_normalize_features(f) for f in pred]
+            target = [self._l2_normalize_features(f) for f in target]
 
         # TODO(mgharbi) Apply Richard's linear weights?
 
-        diffs = [th.sum((p-t)**2, 1) for (p, t) in zip(pred, target)]
+        if self.normalize:
+            diffs = [th.sum((p-t)**2, 1) for (p, t) in zip(pred, target)]
+        else:
+            # mean instead of sum to avoid super high range
+            diffs = [th.mean((p-t)**2, 1) for (p, t) in zip(pred, target)]
 
         # Spatial average
         diffs = [diff.mean([1, 2]) for diff in diffs]
@@ -127,13 +132,14 @@ class LPIPS(th.nn.Module):
         return sum(diffs).mean(0)
 
     class _FeatureExtractor(th.nn.Module):
-        def __init__(self):
+        def __init__(self, pretrained, pre_relu):
             super(LPIPS._FeatureExtractor, self).__init__()
-            vgg_pretrained = models.vgg16(pretrained=True).features
+            vgg_pretrained = models.vgg16(pretrained=pretrained).features
 
             self.breakpoints = [0, 4, 9, 16, 23, 30]
-            for i, _ in enumerate(self.breakpoints[1:]):
-                self.breakpoints[i+1] -= 1
+            if pre_relu:
+                for i, _ in enumerate(self.breakpoints[1:]):
+                    self.breakpoints[i+1] -= 1
 
             # Split at the maxpools
             for i, b in enumerate(self.breakpoints[:-1]):
@@ -141,6 +147,7 @@ class LPIPS(th.nn.Module):
                 for idx in range(b, self.breakpoints[i+1]):
                     op = vgg_pretrained[idx]
                     ops.add_module(str(idx), op)
+                # print(ops)
                 self.add_module("group{}".format(i), ops)
 
             # No gradients
@@ -153,7 +160,7 @@ class LPIPS(th.nn.Module):
 
         def forward(self, x):
             feats = []
-            x = (x-self.shift) / self.scale
+            x = (x - self.shift) / self.scale
             for idx in range(len(self.breakpoints)-1):
                 m = getattr(self, "group{}".format(idx))
                 x = m(x)
@@ -162,11 +169,12 @@ class LPIPS(th.nn.Module):
 
 
 class ELPIPS(th.nn.Module):
-    def __init__(self, pre_relu=True, max_shift=16, nsamples=1):
+    def __init__(self, pretrained=True, normalize=True, pre_relu=True, max_shift=16,
+                 nsamples=1):
         """Ensemble of LPIPS."""
         super(ELPIPS, self).__init__()
-        self.max_shift= max_shift
-        self.ploss = LPIPS(pre_relu=pre_relu)
+        self.max_shift = max_shift
+        self.ploss = LPIPS(pretrained=pretrained, normalize=normalize, pre_relu=pre_relu)
         self.nsamples = nsamples
         LOG.warning("E-LPIPS is untested")
 
@@ -175,7 +183,7 @@ class ELPIPS(th.nn.Module):
         color_scale = th.rand(size=(3,))
         # TODO(mgharbi): Limit anistropic scaling
         # TODO(mgharbi): issue with lowpass in 
-        scale = th.pow(2.0, th.rand(size=(2,))*4.0 - 2.0)
+        scale = th.pow(2.0, th.rand(size=(2,))*2.0 - 2.0)
         scale[1] = scale[0]
         channel_perm = np.random.permutation(3)
         transpose = np.random.choice([True, False])
@@ -222,5 +230,3 @@ class ELPIPS(th.nn.Module):
             losses.append(self.ploss(xa, xb))
         losses = th.stack(losses)
         return losses.mean()
-
-

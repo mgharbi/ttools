@@ -12,6 +12,16 @@ from .utils import get_logger
 LOG = get_logger(__name__)
 
 
+# HAS_AMP = False
+# if th.cuda.is_available():
+#     try:
+#         HAS_AMP = True
+#         from apex import amp, optimizers
+#         LOG.info("Amp FP16 available")
+#     except:
+#         LOG.warn("Amp FP16 is not available")
+
+
 class GANInterface(ModelInterface, abc.ABC):
     """Abstract GAN interface.
 
@@ -37,16 +47,22 @@ class GANInterface(ModelInterface, abc.ABC):
             self.discrim = None
 
         if self.discrim is None:
-            LOG.warning("Using a GAN interface %s with no discriminator")
+            LOG.warning("Using a GAN interface (%s) with no discriminator",
+                        self.__class__.__name__)
+        else:
+            LOG.info("Using GAN (%s) loss with weight %.5f",
+                     self.__class__.__name__, self.gan_weight)
 
         # number of discriminator iterations
         self.iter = 0
 
-        self.cuda = cuda
+        self.device = "cpu"
         if cuda:
-            self.gen.cuda()
-            if discrim is not None:
-                self.discrim.cuda()
+            self.device = "cuda"
+
+        self.gen.to(self.device)
+        if self.discrim is not None:
+            self.discrim.to(self.device)
 
         self.opt_d = None
 
@@ -68,6 +84,15 @@ class GANInterface(ModelInterface, abc.ABC):
                 self.opt_d = th.optim.RMSprop(discrim.parameters(), lr=lr)
         else:
             raise ValueError("invalid optimizer %s" % opt)
+
+        # if HAS_AMP:
+        #     LOG.info("Using AMP 16")
+        #     self.gen, self.opt_g = amp.initialize(
+        #         self.gen, self.opt_g, opt_level="O0")
+        #     if self.discrim:
+        #         self.discrim, self.opt_d = amp.initialize(
+        #             self.discrim, self.opt_d, opt_level="O0")
+
 
     @abc.abstractmethod
     def forward(self, batch):
