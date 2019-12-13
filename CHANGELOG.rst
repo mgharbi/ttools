@@ -1,3 +1,13 @@
+0.0.15
+------
+
+- adds yaml deps
+
+0.0.14
+------
+
+- adds resize script
+
 0.0.13
 ------
 
