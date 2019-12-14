@@ -1,3 +1,8 @@
+0.0.16
+------
+
+- fixes device bug in rgb2ycc
+
 0.0.15
 ------
 

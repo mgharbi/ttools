@@ -57,7 +57,7 @@ class RGB2YCbCr(th.nn.Module):
         self.register_buffer("rgb2ycc", rgb2ycc)
 
     def forward(self, x):
-        y = th.tensordot(x, self.rgb2ycc, ([-3,], [1,])).permute(0, 3, 1, 2)
+        y = th.tensordot(x, self.rgb2ycc.to(x.device), ([-3,], [1,])).permute(0, 3, 1, 2)
         return y
 
 
