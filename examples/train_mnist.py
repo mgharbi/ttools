@@ -178,5 +178,5 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=10, help="number of epochs to train for.")
     parser.add_argument("--bs", type=int, default=64, help="number of elements per batch.")
     args = parser.parse_args()
-    ttools.training.set_logger(True)  # activate debug prints
+    ttools.set_logger(True)  # activate debug prints
     train(args)
