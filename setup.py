@@ -26,6 +26,7 @@ setuptools.setup(
           'console_scripts': [
               'ttools.im2vid = ttools.__main__:im2vid',
               'ttools.resize = ttools.__main__:resize',
+              'ttools.new = ttools.__main__:new_project',
           ]
     },
     author="Michaël Gharbi",
@@ -46,6 +47,7 @@ setuptools.setup(
         "pyaml",
         "imageio",
         "imageio-ffmpeg",
+        "jinja2",
     ],
     classifiers=[
         "Development Status :: 3 - Alpha",
