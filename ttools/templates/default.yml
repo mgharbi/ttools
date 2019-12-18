@@ -1,0 +1,6 @@
+# Some dummy model parameters
+model:
+  depth: 2
+
+# You can add other configuration groups and fetch
+# them from the cfg dictionary in `train.py`
