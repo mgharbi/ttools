@@ -1,3 +1,8 @@
+0.0.18
+------
+
+- templates registered as resources
+
 0.0.17
 ------
 
