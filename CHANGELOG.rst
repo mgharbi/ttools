@@ -1,3 +1,8 @@
+0.0.19
+------
+
+- resources in MANIFEST
+
 0.0.18
 ------
 
