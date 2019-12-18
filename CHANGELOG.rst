@@ -1,3 +1,8 @@
+0.0.20
+------
+
+- re-enable image scripts
+
 0.0.19
 ------
 
