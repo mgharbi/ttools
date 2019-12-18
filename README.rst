@@ -15,6 +15,19 @@ From pip:
 From source:
 ``python setup.py install``
 
+Quickstart
+==========
+
+To quickly get up and running, use our repo initialization script:
+
+```
+ttools.new
+```
+
+This will prompt you to give a name to your new project, and create the
+necessary files and folders for you.
+
+
 
 Documentation
 =============

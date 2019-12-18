@@ -1,3 +1,8 @@
+0.0.17
+------
+
+- adds a scaffolding mechanism to initialize a ttemplate repo with `ttools.new`
+
 0.0.16
 ------
 
