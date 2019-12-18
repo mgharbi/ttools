@@ -18,7 +18,7 @@ From source:
 Quickstart
 ==========
 
-To quickly get up and running, use our repo initialization script:
+To quickly get up and running, use our repo initialization script. In your command line, simple run:
 
 ``ttools.new``
 
