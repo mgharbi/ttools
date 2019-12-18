@@ -14,7 +14,7 @@ with open('ttools/version.py') as fid:
 with open("README.rst", "r") as fh:
     long_description = fh.read()
 
-packages = setuptools.find_packages(exclude=["tests"])
+packages = setuptools.find_packages(exclude=["tests", "ttools.templates"])
 
 docs_require = ["sphinx"]
 tests_require = ["pytest"]
