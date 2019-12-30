@@ -32,14 +32,18 @@ class GANInterface(ModelInterface, abc.ABC):
         ncritic(int): number of discriminator updates per generator update.
         opt(str): optimizer type for both discriminator and generator.
         cuda(bool): whether or not to use CUDA.
+        max_grad_norm(None or scalar): clip gradients above that threshold if
+            provided.
     """
     def __init__(self, gen, discrim, lr=1e-4, ncritic=1, opt="rmsprop",
-                 cuda=th.cuda.is_available(), gan_weight=1.0):
+                 cuda=th.cuda.is_available(), gan_weight=1.0,
+                 max_grad_norm=None):
         super(GANInterface, self).__init__()
         self.gen = gen
         self.discrim = discrim
         self.ncritic = ncritic
         self.gan_weight = gan_weight
+        self.max_grad_norm = max_grad_norm
 
         if self.gan_weight == 0:
             LOG.warning("GAN interface %s has gan_weight==0",
@@ -67,32 +71,23 @@ class GANInterface(ModelInterface, abc.ABC):
         self.opt_d = None
 
         if opt == "sgd":
-            self.opt_g = th.optim.SGD(gen.parameters(), lr=lr)
+            self.opt_g = th.optim.SGD(self.gen.parameters(), lr=lr)
             if self.discrim is not None:
-                self.opt_d = th.optim.SGD(discrim.parameters(), lr=lr)
+                self.opt_d = th.optim.SGD(self.discrim.parameters(), lr=lr)
         elif opt == "adam":
             LOG.warn("Using a momentum-based optimizer in the discriminator,"
                      " this can be problematic.")
             self.opt_g = th.optim.Adam(
-                gen.parameters(), lr=lr, betas=(0.5, 0.999))
+                self.gen.parameters(), lr=lr, betas=(0.5, 0.999))
             if self.discrim is not None:
                 self.opt_d = th.optim.Adam(
-                    discrim.parameters(), lr=lr, betas=(0.5, 0.999))
+                    self.discrim.parameters(), lr=lr, betas=(0.5, 0.999))
         elif opt == "rmsprop":
-            self.opt_g = th.optim.RMSprop(gen.parameters(), lr=lr)
+            self.opt_g = th.optim.RMSprop(self.gen.parameters(), lr=lr)
             if self.discrim is not None:
-                self.opt_d = th.optim.RMSprop(discrim.parameters(), lr=lr)
+                self.opt_d = th.optim.RMSprop(self.discrim.parameters(), lr=lr)
         else:
             raise ValueError("invalid optimizer %s" % opt)
-
-        # if HAS_AMP:
-        #     LOG.info("Using AMP 16")
-        #     self.gen, self.opt_g = amp.initialize(
-        #         self.gen, self.opt_g, opt_level="O0")
-        #     if self.discrim:
-        #         self.discrim, self.opt_d = amp.initialize(
-        #             self.discrim, self.opt_d, opt_level="O0")
-
 
     @abc.abstractmethod
     def forward(self, batch):
@@ -153,7 +148,7 @@ class GANInterface(ModelInterface, abc.ABC):
         """Computes extra losses for the generator if needed.
 
         Returns:
-            None or th.Tensor with shape [1], the total extra loss.
+            None or list of th.Tensor with shape [1], the total extra loss.
         """
         return None
 
@@ -165,7 +160,13 @@ class GANInterface(ModelInterface, abc.ABC):
         Only uses `extra_generator_loss` as objective when `gan_weight==0`.
         """
 
-        loss = self._extra_generator_loss(batch, fwd_data)
+        losses = self._extra_generator_loss(batch, fwd_data)
+        if losses is None:
+            loss = None
+            extra_losses = []
+        else:
+            extra_losses = [l.item() for l in losses]
+            loss = sum(losses)
 
         # No discriminator needed, just use the extra losses
         if self.discrim is None:
@@ -178,9 +179,14 @@ class GANInterface(ModelInterface, abc.ABC):
             # Update the generator with only the non-GAN losses
             self.opt_g.zero_grad()
             loss.backward()
+            if self.max_grad_norm is not None:
+                nrm = th.nn.utils.clip_grad_norm_(self.gen.parameters(), self.max_grad_norm)
+                if nrm > self.max_grad_norm:
+                    LOG.warning("Clipping generator gradients. norm = %.3f > %.3f", nrm, self.max_grad_norm)
             self.opt_g.step()
 
-            return { "loss_g": None, "loss_d": None, "loss": loss.item()}
+            return {"loss_g": None, "loss_d": None, "loss": loss.item(),
+                    "extra_losses": extra_losses}
 
         # If we reach this point, we have a discriminator
 
@@ -206,7 +212,8 @@ class GANInterface(ModelInterface, abc.ABC):
         if loss is not None:
             loss = loss.item()
 
-        return { "loss_g": loss_g, "loss_d": loss_d, "loss": loss}
+        return {"loss_g": loss_g, "loss_d": loss_d, "loss": loss,
+                "extra_losses": extra_losses}
 
     def _update_discriminator(self, fake_pred, real_pred):
         """Generic discriminator update.
@@ -218,6 +225,10 @@ class GANInterface(ModelInterface, abc.ABC):
 
         self.opt_d.zero_grad()
         total_loss.backward()
+        if self.max_grad_norm is not None:
+            nrm = th.nn.utils.clip_grad_norm_(self.discrim.parameters(), self.max_grad_norm)
+            if nrm > self.max_grad_norm:
+                LOG.warning("Clipping discriminator gradients. norm = %.3f > %.3f", nrm, self.max_grad_norm)
         self.opt_d.step()
 
         return loss_d.item()
@@ -237,6 +248,10 @@ class GANInterface(ModelInterface, abc.ABC):
 
         self.opt_g.zero_grad()
         total_loss.backward()
+        if self.max_grad_norm is not None:
+            nrm = th.nn.utils.clip_grad_norm_(self.gen.parameters(), self.max_grad_norm)
+            if nrm > self.max_grad_norm:
+                LOG.warning("Clipping generator gradients. norm = %.3f > %.3f", nrm, self.max_grad_norm)
         self.opt_g.step()
 
         return loss_g.item()

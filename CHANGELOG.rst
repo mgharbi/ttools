@@ -1,3 +1,9 @@
+0.0.21
+------
+
+- gradient clipping in GAN interface
+- separate extra losses in GAN interface
+
 0.0.20
 ------
 
