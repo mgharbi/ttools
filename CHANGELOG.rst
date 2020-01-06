@@ -1,3 +1,8 @@
+0.0.22
+------
+
+- adds --server flag for remote visdom server to callbacks and argparser.
+
 0.0.21
 ------
 

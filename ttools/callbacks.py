@@ -125,11 +125,13 @@ class VisdomLoggingCallback(KeyedCallback):
         0.0 disables smoothing.
     """
 
-    def __init__(self, keys=None, val_keys=None, frequency=100, port=8097,
+    def __init__(self, keys=None, val_keys=None, frequency=100, server=None, port=8097,
                  env="main", log=False, smoothing=0.99):
         super(VisdomLoggingCallback, self).__init__(
             keys=keys, val_keys=val_keys, smoothing=smoothing)
-        self._api = visdom.Visdom(port=port, env=env)
+        if server is None:
+            server = "http://localhost"
+        self._api = visdom.Visdom(server=server, port=port, env=env)
 
         self._opts = {}
 
@@ -420,10 +422,12 @@ class ImageDisplayCallback(Callback, abc.ABC):
       env (string): name of the Visdom environment to log to.
     """
 
-    def __init__(self, frequency=100, port=8097, env="main", win=None):
+    def __init__(self, frequency=100, server=None, port=8097, env="main", win=None):
         super(ImageDisplayCallback, self).__init__()
         self.freq = frequency
-        self._api = visdom.Visdom(port=port, env=env)
+        if server is None:
+            server = "http://localhost"
+        self._api = visdom.Visdom(server=server, port=port, env=env)
         self._step = 0
         if win is None:
             self.win = _random_string()

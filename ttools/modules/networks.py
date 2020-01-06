@@ -230,7 +230,8 @@ class ResidualBlock(nn.Module):
       norm_layer(str): normalization to apply between the convolution modules.
     """
 
-    def __init__(self, n_features, ksize=3, n_convs=2, activation=None, norm_layer=None):
+    def __init__(self, n_features, ksize=3, n_convs=2, 
+                 activation=None, norm_layer=None):
         super(ResidualBlock, self).__init__()
 
         assert isinstance(n_features, int) and n_features > 0, \
@@ -246,7 +247,8 @@ class ResidualBlock(nn.Module):
         self.convpath = th.nn.Sequential(
             ConvChain(n_features, ksize=ksize, width=n_features,
                       depth=n_convs-1, pad=True, activation=activation, norm_layer=norm_layer),
-            ConvModule(n_features, n_features, ksize=ksize, stride=1, pad=True, activation=None, norm_layer=None)  # last layer has no activation
+            ConvModule(n_features, n_features, ksize=ksize, stride=1, pad=True,
+                       activation=None, norm_layer=None)  # last layer has no activation
         )
 
         self.post_skip_activation = None
@@ -289,7 +291,8 @@ class ResidualChain(nn.Module):
             self.add_module(
                 "resblock{}".format(lvl),
                 ResidualBlock(n_features, ksize=ksize, 
-                              n_convs=convs_per_block, activation=activation,
+                              n_convs=convs_per_block, 
+                              activation=activation,
                               norm_layer=norm_layer))
 
     def forward(self, x):
