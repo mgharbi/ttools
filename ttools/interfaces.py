@@ -363,9 +363,8 @@ class WGANInterface(GANInterface):
         c (float): clipping parameter for the Lipschitz constant
                    of the discriminator.
     """
-    def __init__(self, gen, discrim, lr=1e-4, c=0.1, ncritic=5, opt="rmsprop"):
-        super(WGANInterface, self).__init__(
-            gen, discrim, lr=lr, ncritic=ncritic, opt=opt)
+    def __init__(self, *args, c=0.1, **kwargs):
+        super(WGANInterface, self).__init__(*args, **kwargs)
         assert c > 0, "clipping param should be positive."
         self.c = c
 
