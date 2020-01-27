@@ -19,7 +19,7 @@ def _win(name):
     return name
 
 
-def tensor(t, name):
+def tensor(t, name, normalize=True):
     if isinstance(t, np.ndarray) and len(t.shape) == 3:
         t = th.from_numpy(t).permute(2, 0, 1).unsqueeze(0)
     elif len(t.shape) != 4:
@@ -28,16 +28,17 @@ def tensor(t, name):
     if c != 3:  # unroll channels
         t = t.view(b*c, 1, h, w)
 
-    # normalize for display
     mini = t.min()
     maxi = t.max()
 
-    if False:
-        mu = t.mean()
-        std = t.std()
-        t = 0.5*((t-mu) / 2*std + 1)
-    else:
-        t = (t-mini) / (maxi - mini + 1e-12)
+    # normalize for display
+    if normalize:
+        if False:
+            mu = t.mean()
+            std = t.std()
+            t = 0.5*((t-mu) / 2*std + 1)
+        else:
+            t = (t-mini) / (maxi - mini + 1e-12)
 
     opts = {
         "caption": "{} [{:.2f}, {:.2f}]".format(name, mini, maxi)
@@ -45,3 +46,20 @@ def tensor(t, name):
 
     t = th.clamp(t, 0, 1)
     _api.images(t, win=_win(name), nrow=b, opts=opts)
+
+
+def scatter(x, y, name):
+    if isinstance(x, np.ndarray):
+        x = th.from_numpy(x)
+    if isinstance(y, np.ndarray):
+        y = th.from_numpy(y)
+    x = x.cpu().view(-1)
+    y = y.cpu().view(-1)
+
+    # opts = {
+    #     "caption": "{} [{:.2f}, {:.2f}]".format(name, mini, maxi)
+    # }
+
+    xy = th.stack([x, y], 1)
+
+    _api.scatter(xy, win=_win(name))

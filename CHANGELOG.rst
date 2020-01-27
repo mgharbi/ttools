@@ -1,3 +1,8 @@
+0.0.24
+------
+
+- Fix crop_like to accept odd sizes
+
 0.0.23
 ------
 

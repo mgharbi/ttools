@@ -162,15 +162,15 @@ class GANInterface(ModelInterface, abc.ABC):
 
         losses = self._extra_generator_loss(batch, fwd_data)
         if losses is None:
-            loss = None
             extra_losses = []
+            extra_g_loss = None
         else:
             extra_losses = [l.item() for l in losses]
-            loss = sum(losses)
+            extra_g_loss = sum(losses)
 
         # No discriminator needed, just use the extra losses
         if self.discrim is None:
-            if loss is None:
+            if extra_g_loss is None:
                 LOG.error("Training a GAN with no discriminator and no extra "
                           "loss: nothing to optimize!")
                 raise RuntimeError("Training a GAN with no discriminator"
@@ -178,14 +178,15 @@ class GANInterface(ModelInterface, abc.ABC):
 
             # Update the generator with only the non-GAN losses
             self.opt_g.zero_grad()
-            loss.backward()
+            extra_g_loss.backward()
             if self.max_grad_norm is not None:
-                nrm = th.nn.utils.clip_grad_norm_(self.gen.parameters(), self.max_grad_norm)
+                nrm = th.nn.utils.clip_grad_norm_(self.gen.parameters(),
+                                                  self.max_grad_norm)
                 if nrm > self.max_grad_norm:
                     LOG.warning("Clipping generator gradients. norm = %.3f > %.3f", nrm, self.max_grad_norm)
             self.opt_g.step()
 
-            return {"loss_g": None, "loss_d": None, "loss": loss.item(),
+            return {"loss_g": None, "loss_d": None, "loss": extra_g_loss.item(),
                     "extra_losses": extra_losses}
 
         # If we reach this point, we have a discriminator
@@ -193,6 +194,10 @@ class GANInterface(ModelInterface, abc.ABC):
         loss_g = None
         loss_d = None
         if self.iter < self.ncritic:  # Update discriminator
+            # disable grads on gen
+            for n, p in self.gen.named_parameters():
+                p.requires_grad = False
+            # d_losses = self._extra_discriminator_loss(batch, fwd_data)
             # We detach the generated samples, so that no grads propagate to
             # the generator here.
             fake_pred = self.discrim(
@@ -200,19 +205,33 @@ class GANInterface(ModelInterface, abc.ABC):
             real_pred = self.discrim(
                 self._discriminator_input(batch, fwd_data, fake=False))
             loss_d = self._update_discriminator(fake_pred, real_pred)
+            # revert grads on gen
+            for n, p in self.gen.named_parameters():
+                p.requires_grad = True
             self.iter += 1
         else:  # Update generator
-            self.iter = 0
-            fake_pred_g = self.discrim(
-                self._discriminator_input(batch, fwd_data, fake=True))
-            real_pred_g = self.discrim(
-                self._discriminator_input(batch, fwd_data, fake=False))
-            loss_g = self._update_generator(fake_pred_g, real_pred_g, loss)
+            self.iter = 0  # reset discrim it counter
 
-        if loss is not None:
-            loss = loss.item()
+            # disable grads on discrim
+            for n, p in self.discrim.named_parameters():
+                p.requires_grad = False
 
-        return {"loss_g": loss_g, "loss_d": loss_d, "loss": loss,
+            # classify real/fake
+            fake_in = self._discriminator_input(batch, fwd_data, fake=True)
+            fake_pred_g = self.discrim(fake_in)
+            real_in = self._discriminator_input(batch, fwd_data, fake=False)
+            real_pred_g = self.discrim(real_in)
+
+            loss_g = self._update_generator(fake_pred_g, real_pred_g, extra_g_loss)
+
+            # revert grads on discrim
+            for n, p in self.discrim.named_parameters():
+                p.requires_grad = True
+
+        if extra_g_loss is not None:
+            extra_g_loss = extra_g_loss.item()
+
+        return {"loss_g": loss_g, "loss_d": loss_d, "loss": extra_g_loss,
                 "extra_losses": extra_losses}
 
     def _update_discriminator(self, fake_pred, real_pred):
@@ -224,9 +243,11 @@ class GANInterface(ModelInterface, abc.ABC):
         total_loss = loss_d * self.gan_weight
 
         self.opt_d.zero_grad()
+
         total_loss.backward()
         if self.max_grad_norm is not None:
-            nrm = th.nn.utils.clip_grad_norm_(self.discrim.parameters(), self.max_grad_norm)
+            nrm = th.nn.utils.clip_grad_norm_(self.discrim.parameters(),
+                                              self.max_grad_norm)
             if nrm > self.max_grad_norm:
                 LOG.warning("Clipping discriminator gradients. norm = %.3f > %.3f", nrm, self.max_grad_norm)
         self.opt_d.step()
@@ -236,7 +257,13 @@ class GANInterface(ModelInterface, abc.ABC):
     def _update_generator(self, fake_pred, real_pred, extra_loss):
         """Generic generator update.
 
-        Combines the GAN object with extra losses if provided.
+        Combines the GAN objective with extra losses if provided.
+
+        Args:
+            fake_pred(th.Tensor): output of the discriminator on fake
+                predictions.
+            real_pred(th.Tensor): output of the discriminator on real
+                predictions.
         """
         loss_g = self._generator_gan_loss(fake_pred, real_pred)
 
@@ -249,7 +276,8 @@ class GANInterface(ModelInterface, abc.ABC):
         self.opt_g.zero_grad()
         total_loss.backward()
         if self.max_grad_norm is not None:
-            nrm = th.nn.utils.clip_grad_norm_(self.gen.parameters(), self.max_grad_norm)
+            nrm = th.nn.utils.clip_grad_norm_(self.gen.parameters(),
+                                              self.max_grad_norm)
             if nrm > self.max_grad_norm:
                 LOG.warning("Clipping generator gradients. norm = %.3f > %.3f", nrm, self.max_grad_norm)
         self.opt_g.step()
@@ -281,11 +309,13 @@ class RGANInterface(SGANInterface):
 
     """
     def _discriminator_gan_loss(self, fake_pred, real_pred):
-        loss_d = self.cross_entropy(real_pred-fake_pred, th.ones_like(real_pred))
+        loss_d = self.cross_entropy(
+            real_pred - fake_pred, th.ones_like(real_pred))
         return loss_d
 
     def _generator_gan_loss(self, fake_pred, real_pred):
-        loss_g = self.cross_entropy(fake_pred-real_pred, th.ones_like(fake_pred))
+        loss_g = self.cross_entropy(
+            fake_pred - real_pred, th.ones_like(fake_pred))
         return loss_g
 
 

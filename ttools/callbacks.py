@@ -639,4 +639,3 @@ class TensorBoardImageDisplayCallback(Callback, abc.ABC):
         t = self.datasize * (self.epoch+1)
         self._val_writer.add_image(self.tag(), make_grid(viz), t)
         self.first_step = False
-

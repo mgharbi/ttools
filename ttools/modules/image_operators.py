@@ -15,11 +15,11 @@ def crop_like(src, tgt):
     tgt_sz = np.array(tgt.shape)
 
     # Assumes the spatial dimensions are the last two
-    crop = (src_sz[-2:]-tgt_sz[-2:])
-    assert (np.mod(crop, 2) == 0).all(), "crop like sizes should be even"
-    crop //= 2
+    delta = (src_sz[-2:]-tgt_sz[-2:])
+    crop = delta // 2
+    crop2 = delta - crop
     if (crop > 0).any():
-        return src[..., crop[0]:src_sz[-2]-crop[0], crop[1]:src_sz[-1]-crop[1]]
+        return src[..., crop[0]:src_sz[-2]-crop2[0], crop[1]:src_sz[-1]-crop2[1]]
     else:
         return src
 
@@ -90,6 +90,33 @@ class ImageGradients(th.nn.Module):
 
   def forward(self, im):
     return th.cat([self.dx(im), self.dy(im)], 1)
+
+
+class GaussianBlur(th.nn.Module):
+    def __init__(self, sigma, channels=3):
+        super(GaussianBlur, self).__init__()
+        ksize = int(np.ceil(4*sigma))
+        self.ksize = ksize
+
+        self.channels = channels
+
+        kernel = th.pow(th.arange(-ksize, ksize+1).float(), 2) / (2*sigma*sigma)
+        kernel = th.exp(-kernel)
+        kernel /= kernel.sum()
+        self.register_buffer("kernel", kernel.view(1, 2*ksize+1).repeat(channels, 1))
+
+    def forward(self, x):
+        c, h, w = x.shape[-3:]
+        assert c == self.channels
+        ksize = self.ksize
+        # Gaussian blur
+        lp = th.nn.functional.pad(x, (ksize, ksize, ksize, ksize), mode="reflect")
+
+        # blur y
+        lp = th.nn.functional.conv2d(lp, self.kernel.view(self.channels, 1, 2*ksize+1, 1), groups=self.channels)
+        # blur x
+        lp = th.nn.functional.conv2d(lp, self.kernel.view(self.channels, 1, 1, 2*ksize+1), groups=self.channels)
+        return lp
 
 # class MedianFilter(nn.Module):
 #   def __init__(self, ksize=3):
