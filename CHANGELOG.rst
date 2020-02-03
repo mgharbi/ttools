@@ -1,3 +1,8 @@
+0.0.25
+------
+
+- Makes padding optional in resnet
+
 0.0.24
 ------
 
