@@ -7,9 +7,15 @@ import torch as th
 from torch import nn
 
 from ..utils import get_logger
+from .image_operators import crop_like
 
 
 LOG = get_logger(__name__)
+
+
+class CropLike(nn.Module):
+    def forward(self, x, y):
+        return crop_like(x, y)
 
 
 class FCModule(nn.Module):
@@ -228,10 +234,11 @@ class ResidualBlock(nn.Module):
       n_convs(int): number of convolutions in the non-skip path.
       activation(str): nonlinear activation function between convolutions.
       norm_layer(str): normalization to apply between the convolution modules.
+      pad(bool): if True, zero pad the convolutions to maintain a constant size.
     """
 
     def __init__(self, n_features, ksize=3, n_convs=2, 
-                 activation=None, norm_layer=None):
+                 activation=None, norm_layer=None, pad=True):
         super(ResidualBlock, self).__init__()
 
         assert isinstance(n_features, int) and n_features > 0, \
@@ -241,13 +248,16 @@ class ResidualBlock(nn.Module):
         assert isinstance(
             n_convs, int) and n_convs >= 2, "Number of convolutions should be at least 2."
 
-        padding = (ksize - 1) // 2
+        padding = 0
+        self.pad = pad
+        if self.pad:
+            padding = (ksize - 1) // 2
 
         self.n_convs = n_convs
         self.convpath = th.nn.Sequential(
             ConvChain(n_features, ksize=ksize, width=n_features,
-                      depth=n_convs-1, pad=True, activation=activation, norm_layer=norm_layer),
-            ConvModule(n_features, n_features, ksize=ksize, stride=1, pad=True,
+                      depth=n_convs-1, pad=self.pad, activation=activation, norm_layer=norm_layer),
+            ConvModule(n_features, n_features, ksize=ksize, stride=1, pad=self.pad,
                        activation=None, norm_layer=None)  # last layer has no activation
         )
 
@@ -256,7 +266,19 @@ class ResidualBlock(nn.Module):
             self.post_skip_activation = _get_activation(activation)
 
     def forward(self, x):
-        x = self.convpath(x) + x  # residual connection
+        conv_features = self.convpath(x)
+        if self.pad:  # no need to crop
+            cropped = x
+        else:
+            h, w = x.shape[-2:]
+            new_h, new_w = conv_features.shape[-2:]
+            ch = (h - new_h) // 2
+            cw = (w - new_w) // 2
+            ch2 = (h - new_h) - ch
+            cw2 = (w - new_w) - cw
+            cropped = x[..., ch:h-ch2, cw:w-cw2]
+
+        x = conv_features + cropped  # residual connection
         if self.post_skip_activation is not None:
             x = self.post_skip_activation(x)
         return x
@@ -272,10 +294,11 @@ class ResidualChain(nn.Module):
       convs_per_block(int): number of convolution per residual block
       activation(str): nonlinear activation function between convolutions.
       norm_layer(str): normalization to apply between the convolution modules.
+      pad(bool): if True, zero pad the convolutions to maintain a constant size.
     """
 
     def __init__(self, n_features, ksize=3, depth=3, convs_per_block=2,
-                 activation="relu", norm_layer=None):
+                 activation="relu", norm_layer=None, pad=True):
         super(ResidualChain, self).__init__()
         LOG.warning("ResidualChain has not been tested, beware!")
 
@@ -293,7 +316,7 @@ class ResidualChain(nn.Module):
                 ResidualBlock(n_features, ksize=ksize, 
                               n_convs=convs_per_block, 
                               activation=activation,
-                              norm_layer=norm_layer))
+                              norm_layer=norm_layer, pad=pad))
 
     def forward(self, x):
         for m in self.children():
