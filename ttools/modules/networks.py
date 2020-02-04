@@ -1,8 +1,11 @@
 """Common used neural networks operations."""
 
-# TODO(mgharbi): maybe add a norm layer at the output if we specify an activation fn ?
+# TODO(mgharbi): maybe add a norm layer at the output if we specify an
+# activation fn ?
 
+from collections import OrderedDict
 
+import numpy as np
 import torch as th
 from torch import nn
 
@@ -267,17 +270,7 @@ class ResidualBlock(nn.Module):
 
     def forward(self, x):
         conv_features = self.convpath(x)
-        if self.pad:  # no need to crop
-            cropped = x
-        else:
-            h, w = x.shape[-2:]
-            new_h, new_w = conv_features.shape[-2:]
-            ch = (h - new_h) // 2
-            cw = (w - new_w) // 2
-            ch2 = (h - new_h) - ch
-            cw2 = (w - new_w) - cw
-            cropped = x[..., ch:h-ch2, cw:w-cw2]
-
+        cropped = crop_like(x, conv_features)
         x = conv_features + cropped  # residual connection
         if self.post_skip_activation is not None:
             x = self.post_skip_activation(x)
@@ -439,5 +432,88 @@ def _init_fc_or_conv(fc_conv, activation):
     nn.init.xavier_uniform_(fc_conv.weight, gain)
     if fc_conv.bias is not None:
         nn.init.constant_(fc_conv.bias, 0.0)
+
+
+class FixupBasicBlock(nn.Module):
+    # https://openreview.net/pdf?id=H1gsz30cKX
+    expansion = 1
+
+    def __init__(self, n_features, ksize=3, pad=True, activation="relu"):
+        super(FixupBasicBlock, self).__init__()
+        self.bias1a = nn.Parameter(th.zeros(1))
+        self.conv1 = ConvModule(n_features, n_features, ksize=ksize, stride=1,
+                                pad=pad, activation=None, norm_layer=None)
+        self.bias1b = nn.Parameter(th.zeros(1))
+        self.activation = _get_activation(activation)
+        self.bias2a = nn.Parameter(th.zeros(1))
+        self.conv2 = ConvModule(n_features, n_features, ksize=ksize, stride=1,
+                                pad=pad, activation=None, norm_layer=None)
+        self.scale = nn.Parameter(th.ones(1))
+        self.bias2b = nn.Parameter(th.zeros(1))
+        self.activation2 = _get_activation(activation)
+
+    def forward(self, x):
+        identity = x
+
+        out = self.conv1(x + self.bias1a)
+        out = self.activation(out + self.bias1b)
+
+        out = self.conv2(out + self.bias2a)
+        out = out * self.scale + self.bias2b
+
+        identity = crop_like(identity, out)
+        out += identity
+        out = self.activation2(out)
+
+        return out
+
+
+class FixupResidualChain(nn.Module):
+    """Linear chain of residual blocks.
+
+    Args:
+      n_features(int): number of input channels.
+      depth(int): number of residual blocks
+      ksize(int): size of the convolution kernel (square).
+      activation(str): nonlinear activation function between convolutions.
+      norm_layer(str): normalization to apply between the convolution modules.
+      pad(bool): if True, zero pad the convs to maintain a constant size.
+    """
+
+    def __init__(self, n_features, depth=3, ksize=3, activation="relu",
+                 norm_layer=None, pad=True):
+        super(FixupResidualChain, self).__init__()
+
+        assert isinstance(
+            n_features, int) and n_features > 0, "Number of feature channels should be a positive integer"
+        assert (isinstance(ksize, int) and ksize > 0) or isinstance(
+            ksize, list), "Kernel size should be a positive integer or a list of integers"
+        assert isinstance(
+            depth, int) and depth > 0 and depth < 16, "Depth should be a positive integer lower than 16"
+
+        self.depth = depth
+
+        # Core processing layers
+        layers = OrderedDict()
+        for lvl in range(depth):
+            blockname = "resblock{}".format(lvl)
+            layers[blockname] = FixupBasicBlock(
+                n_features, ksize=ksize, activation=activation, pad=pad)
+
+        self.net = nn.Sequential(layers)
+
+        self._reset_weights()
+
+    def _reset_weights(self):
+        for m in self.net.modules():
+            if isinstance(m, FixupBasicBlock):
+                nn.init.normal_(
+                    m.conv1.conv.weight, mean=0, std=np.sqrt(2 /
+                                (m.conv1.conv.weight.shape[0] * np.prod(m.conv1.conv.weight.shape[2:]))) * self.depth ** (-0.5))
+                nn.init.constant_(m.conv2.conv.weight, 0)
+
+    def forward(self, x):
+        x = self.net(x)
+        return x
 
 # -----------------------------------------------------------------------------

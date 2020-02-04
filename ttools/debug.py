@@ -19,7 +19,7 @@ def _win(name):
     return name
 
 
-def tensor(t, name, normalize=True):
+def tensor(t, name, normalize=True, minmax=False):
     if isinstance(t, np.ndarray) and len(t.shape) == 3:
         t = th.from_numpy(t).permute(2, 0, 1).unsqueeze(0)
     elif len(t.shape) != 4:
@@ -33,12 +33,12 @@ def tensor(t, name, normalize=True):
 
     # normalize for display
     if normalize:
-        if False:
+        if minmax:
+            t = (t-mini) / (maxi - mini + 1e-12)
+        else:
             mu = t.mean()
             std = t.std()
             t = 0.5*((t-mu) / 2*std + 1)
-        else:
-            t = (t-mini) / (maxi - mini + 1e-12)
 
     opts = {
         "caption": "{} [{:.2f}, {:.2f}]".format(name, mini, maxi)

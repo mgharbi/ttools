@@ -2,6 +2,7 @@
 import numpy as np
 import torch as th
 
+
 def crop_like(src, tgt):
     """Crop a source image to match the spatial dimensions of a target.
 
@@ -16,12 +17,14 @@ def crop_like(src, tgt):
 
     # Assumes the spatial dimensions are the last two
     delta = (src_sz[-2:]-tgt_sz[-2:])
-    crop = delta // 2
+    crop = np.maximum(delta // 2, 0)  # no negative crop
     crop2 = delta - crop
-    if (crop > 0).any():
-        return src[..., crop[0]:src_sz[-2]-crop2[0], crop[1]:src_sz[-1]-crop2[1]]
+    if (crop > 0).any() or (crop2 > 0).any():
+        return src[..., crop[0]:src_sz[-2]-crop2[0],
+                   crop[1]:src_sz[-1]-crop2[1]]
     else:
         return src
+
 
 class RGB2YCbCr(th.nn.Module):
     def __init__(self):
