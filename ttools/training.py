@@ -328,7 +328,7 @@ class Checkpointer(object):
         LOG.info("Loading weights from foreign checkpoint {}".format(path))
         if not os.path.exists(path):
             raise ValueError("Checkpoint {} does not exist".format(path))
-        chkpt = th.load(path)
+        chkpt = th.load(path, map_location=th.device("cpu"))
         if "model" not in chkpt.keys() or chkpt["model"] is None:
             raise ValueError("{} has no model saved".format(path))
         mdl = chkpt["model"]
