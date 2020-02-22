@@ -39,7 +39,8 @@ def main(args):
     # Initialize datasets
     data = {{name}}.Dataset(args.data)
     dataloader = DataLoader(data, batch_size=args.bs,
-                            num_workers=args.num_worker_threads)
+                            num_workers=args.num_worker_threads,
+                            shuffle=True)
     val_dataloader = None
     if args.val_data is not None:
         val_data = {{name}}.Dataset(args.val_data)

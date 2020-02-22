@@ -16,10 +16,16 @@ def crop_like(src, tgt):
     tgt_sz = np.array(tgt.shape)
 
     # Assumes the spatial dimensions are the last two
-    delta = (src_sz[-2:]-tgt_sz[-2:])
+    delta = (src_sz[2:4]-tgt_sz[2:4])
+    # delta = (src_sz[-2:]-tgt_sz[-2:])
     crop = np.maximum(delta // 2, 0)  # no negative crop
     crop2 = delta - crop
+
     if (crop > 0).any() or (crop2 > 0).any():
+        # NOTE: convert to ints to enable static slicing in ONNX conversion
+        src_sz = [int(x) for x in src_sz]
+        crop = [int(x) for x in crop]
+        crop2 = [int(x) for x in crop2]
         return src[..., crop[0]:src_sz[-2]-crop2[0],
                    crop[1]:src_sz[-1]-crop2[1]]
     else:

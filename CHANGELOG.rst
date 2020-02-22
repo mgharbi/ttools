@@ -1,3 +1,8 @@
+0.0.27
+------
+
+- Adds Multiplot callback
+
 0.0.26
 ------
 

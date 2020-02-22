@@ -452,6 +452,9 @@ class FixupBasicBlock(nn.Module):
         self.bias2b = nn.Parameter(th.zeros(1))
         self.activation2 = _get_activation(activation)
 
+        self.ksize = 3
+        self.pad = pad
+
     def forward(self, x):
         identity = x
 
@@ -461,7 +464,10 @@ class FixupBasicBlock(nn.Module):
         out = self.conv2(out + self.bias2a)
         out = out * self.scale + self.bias2b
 
-        identity = crop_like(identity, out)
+        crop = ((self.ksize-1) // 2) * 2
+        if crop > 0 and not self.pad:
+            identity = identity[:, :, crop:-crop, crop:-crop]
+            # identity = crop_like(identity, out)
         out += identity
         out = self.activation2(out)
 

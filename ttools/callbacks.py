@@ -8,6 +8,7 @@ import random
 import string
 import subprocess
 import time
+import numpy as np
 
 from tqdm import tqdm
 from torchvision.utils import make_grid
@@ -23,6 +24,7 @@ __all__ = [
     "ImageDisplayCallback",
     "ProgressBarCallback",
     "VisdomLoggingCallback",
+    "MultiPlotCallback",
 ]
 
 
@@ -100,7 +102,8 @@ class KeyedCallback(Callback):
             self.keys = keys
 
         if val_keys is None:
-            self.val_keys = self.keys
+            self.val_keys = [] 
+            # self.val_keys = self.keys
         else:
             self.val_keys = val_keys
 
@@ -175,6 +178,82 @@ class VisdomLoggingCallback(KeyedCallback):
         for k in self.val_keys:
             self._api.line([val_data[k]], [t], update="append", win=k, name="val",
                            opts=self._opts[k])
+
+
+class MultiPlotCallback(KeyedCallback):
+    """A callback that logs scalar quantities to a single Visdom window.
+
+    Args:
+      keys (list of str): list of keys whose values will be logged during training.
+      val_keys (list of str): list of keys whose values will be logged during validation
+      frequency(int): number of steps between display updates.
+      port (int): Port of the Visdom server to log to.
+      env (string): name of the Visdom environment to log to.
+      log (bool): if True, shows the data on a log-scale
+      smoothing(float): smoothing factor for the exponential moving average.
+        0.0 disables smoothing.
+      win(str): name of the window
+    """
+
+    def __init__(self, keys=None, val_keys=None, frequency=100, server=None, port=8097,
+                 env="main", log=False, smoothing=0.99, win=None):
+        super(MultiPlotCallback, self).__init__(
+            keys=keys, val_keys=val_keys, smoothing=smoothing)
+        if server is None:
+            server = "http://localhost"
+        self._api = visdom.Visdom(server=server, port=port, env=env)
+
+        if win is None:
+            self.win = _random_string()
+        else:
+            self.win = win
+
+        if self._api.win_exists(win):
+            self._api.close(win)
+
+        # Cleanup previous plots and setup options
+        all_keys = set(self.keys + self.val_keys)
+        legend = []
+        for k in list(all_keys):
+            if k in self.keys:
+                legend.append(k)
+            if k in self.val_keys:
+                legend.append(k + "_val")
+
+        self._opts = {
+            "legend": legend,
+            "title": self.win,
+            "xlabel": "epoch",
+        }
+        if log:
+            self._opts["ytype"] = "log"
+
+        self._step = 0
+        self.frequency = frequency
+
+    def batch_end(self, batch_data, fwd, bwd):
+        super(MultiPlotCallback, self).batch_end(batch_data, fwd, bwd)
+
+        if self._step % self.frequency != 0:
+            self._step += 1
+            return
+        self._step = 0
+
+        t = self.batch / self.datasize + self.epoch
+
+        data = np.array([self.ema[k] for k in self.keys])
+        data = np.expand_dims(data, 1)
+        self._api.line(data, [t], update="append", win=self.win, opts=self._opts)
+
+        self._step += 1
+
+    def validation_end(self, val_data):
+        pass
+        # super(MultiPlotCallback, self).validation_end(val_data)
+        # t = self.epoch + 1
+        # for k in self.val_keys:
+        #     self._api.line([val_data[k]], [t], update="append", win=self.win, name=k + "_val",
+        #                    opts=self._opts)
 
 
 class LoggingCallback(KeyedCallback):
