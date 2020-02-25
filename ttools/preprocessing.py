@@ -10,7 +10,7 @@ LOG = get_logger(__name__)
 
 
 def extract_tiles(im, tile_size=128, tile_stride=None,
-                  drop_last=True):
+                  drop_last=True, align=None):
     """Generator that extracts tiles from an image.
 
     Args:
@@ -23,6 +23,7 @@ def extract_tiles(im, tile_size=128, tile_stride=None,
             does not divide the image dimension. Otherwise, shift
             the tile to make sure it is in bounds
             (creates an overlap for the last tile)
+        align(int or None): align to a multiple of this value.
     Yields:
         tile(np.arrray): the subimage extracted
         coord(2-tuple): the (y, x) coordinate of the tile's top left corner.
@@ -50,6 +51,8 @@ def extract_tiles(im, tile_size=128, tile_stride=None,
             if drop_last:
                 break
             y = h - tile_size
+            if align is not None:
+                y -= y % align
             if y < 0:  # Image is smaller than a tile
                 break
 
@@ -58,6 +61,8 @@ def extract_tiles(im, tile_size=128, tile_stride=None,
                 if drop_last:
                     break
                 x = w - tile_size
+                if align is not None:
+                    x -= x % align
                 if x < 0:  # Image is smaller than a tile
                     break
             tile = extractor(x, y)

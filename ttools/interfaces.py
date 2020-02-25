@@ -111,6 +111,8 @@ class GANInterface(ModelInterface, abc.ABC):
             fake(bool): if True we're providing a fake sample to the
                 discriminator, otherwise a true example.
 
+        Retuns:
+            Tensor or list of tensors
         Implement in derived classes.
         """
         pass
@@ -151,6 +153,29 @@ class GANInterface(ModelInterface, abc.ABC):
             None or list of th.Tensor with shape [1], the total extra loss.
         """
         return None
+
+    def _eval_d(self, d_inputs, backprop):
+        """Eval the discriminators (optionally prevent backprop to inputs).
+
+        Args:
+            discrim_inputs (Tensor or list of Tensor): inputs to the
+            discriminator.
+            backrop: if False, the inputs are detached from the graph (e.g.
+                for the discriminator update we do not update the generated
+                tensors).
+        Returns:
+        """
+
+        if isinstance(d_inputs, list):
+            args = d_inputs
+        else:  # assumes single input
+            args = [d_inputs]
+
+        # Detach the inputs to avoid backprops
+        if not backprop:
+            args = [a.detach() for a in args]
+
+        return self.discrim(*args)
 
     def backward(self, batch, fwd_data):
         """Generic GAN backward step.
@@ -200,10 +225,10 @@ class GANInterface(ModelInterface, abc.ABC):
             # d_losses = self._extra_discriminator_loss(batch, fwd_data)
             # We detach the generated samples, so that no grads propagate to
             # the generator here.
-            fake_pred = self.discrim(
-                self._discriminator_input(batch, fwd_data, fake=True).detach())
-            real_pred = self.discrim(
-                self._discriminator_input(batch, fwd_data, fake=False))
+            fake_pred = self._eval_d(
+                self._discriminator_input(batch, fwd_data, fake=True), False)
+            real_pred = self._eval_d(
+                self._discriminator_input(batch, fwd_data, fake=False), True)
             loss_d = self._update_discriminator(fake_pred, real_pred)
             # revert grads on gen
             for n, p in self.gen.named_parameters():
@@ -218,9 +243,9 @@ class GANInterface(ModelInterface, abc.ABC):
 
             # classify real/fake
             fake_in = self._discriminator_input(batch, fwd_data, fake=True)
-            fake_pred_g = self.discrim(fake_in)
+            fake_pred_g = self._eval_d(fake_in, True)
             real_in = self._discriminator_input(batch, fwd_data, fake=False)
-            real_pred_g = self.discrim(real_in)
+            real_pred_g = self._eval_d(real_in, True)
 
             loss_g = self._update_generator(fake_pred_g, real_pred_g, extra_g_loss)
 

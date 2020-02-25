@@ -1,3 +1,8 @@
+0.0.28
+------
+
+- Allows multiple inputs in discriminators
+
 0.0.27
 ------
 
