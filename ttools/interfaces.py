@@ -219,10 +219,6 @@ class GANInterface(ModelInterface, abc.ABC):
         loss_g = None
         loss_d = None
         if self.iter < self.ncritic:  # Update discriminator
-            # disable grads on gen
-            for n, p in self.gen.named_parameters():
-                p.requires_grad = False
-            # d_losses = self._extra_discriminator_loss(batch, fwd_data)
             # We detach the generated samples, so that no grads propagate to
             # the generator here.
             fake_pred = self._eval_d(
@@ -230,16 +226,10 @@ class GANInterface(ModelInterface, abc.ABC):
             real_pred = self._eval_d(
                 self._discriminator_input(batch, fwd_data, fake=False), True)
             loss_d = self._update_discriminator(fake_pred, real_pred)
-            # revert grads on gen
-            for n, p in self.gen.named_parameters():
-                p.requires_grad = True
+
             self.iter += 1
         else:  # Update generator
             self.iter = 0  # reset discrim it counter
-
-            # disable grads on discrim
-            for n, p in self.discrim.named_parameters():
-                p.requires_grad = False
 
             # classify real/fake
             fake_in = self._discriminator_input(batch, fwd_data, fake=True)
@@ -248,10 +238,6 @@ class GANInterface(ModelInterface, abc.ABC):
             real_pred_g = self._eval_d(real_in, True)
 
             loss_g = self._update_generator(fake_pred_g, real_pred_g, extra_g_loss)
-
-            # revert grads on discrim
-            for n, p in self.discrim.named_parameters():
-                p.requires_grad = True
 
         if extra_g_loss is not None:
             extra_g_loss = extra_g_loss.item()

@@ -1,3 +1,8 @@
+0.0.29
+------
+
+- De-activate 'requires_grad' flag in GAN interfaces.
+
 0.0.28
 ------
 
