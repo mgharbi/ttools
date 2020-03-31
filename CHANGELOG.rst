@@ -1,3 +1,8 @@
+0.0.30
+------
+
+- Adds optimizers state_dict i/o to checkpointers
+
 0.0.29
 ------
 
