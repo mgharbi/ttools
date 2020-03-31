@@ -52,15 +52,13 @@ class TestCheckpointer(unittest.TestCase):
 
     def test_save_and_load_model(self):
         model = th.nn.Conv2d(1, 1, 1)
-        opt = th.optim.Adam(model.parameters(), lr=1e-3, eps=1e-8)
-        chkpt = Checkpointer(self.root, model=model, meta=opt)
+        chkpt = Checkpointer(self.root, model=model)
 
-        # Create a different model with its own optimizer
+        # Create a different model
         model2 = th.nn.Conv2d(1, 1, 1)
         model2.weight.data = model.weight.data*2
         model2.bias.data = model.bias.data*2
-        opt2 = th.optim.Adam(model2.parameters(), lr=1e-5, eps=1e-2)
-        chkpt2 = Checkpointer(self.root, model=model2, meta=opt2)
+        chkpt2 = Checkpointer(self.root, model=model2)
 
         # Save model 1 and load its params with model2
         chkpt.save("first")
@@ -69,9 +67,28 @@ class TestCheckpointer(unittest.TestCase):
         assert model.weight.data == model2.weight.data
         assert model.bias.data == model2.bias.data
 
-        assert opt.state_dict()["param_groups"][0]["lr"] == res[1].state_dict()[
+    def test_save_and_load_optimizer(self):
+        model = th.nn.Conv2d(1, 1, 1)
+        opt = th.optim.Adam(model.parameters(), lr=1e-3, eps=1e-8)
+        chkpt = Checkpointer(self.root, model=model, optimizers=[opt])
+
+        # Create a different model with its own optimizer
+        model2 = th.nn.Conv2d(1, 1, 1)
+        model2.weight.data = model.weight.data*2
+        model2.bias.data = model.bias.data*2
+        opt2 = th.optim.Adam(model2.parameters(), lr=1e-3, eps=1e-8)
+        chkpt2 = Checkpointer(self.root, model=model2, optimizers=[opt2])
+
+        # Save model 1 and load its params with model2
+        chkpt.save("first")
+        chkpt2.load("first")
+
+        assert model.weight.data == model2.weight.data
+        assert model.bias.data == model2.bias.data
+
+        assert opt.state_dict()["param_groups"][0]["lr"] == opt2.state_dict()[
             "param_groups"][0]["lr"]
-        assert opt.state_dict()["param_groups"][0]["eps"] == res[1].state_dict()[
+        assert opt.state_dict()["param_groups"][0]["eps"] == opt2.state_dict()[
             "param_groups"][0]["eps"]
 
     def test_save_gpu_and_load_cpu(self):
