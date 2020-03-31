@@ -241,6 +241,7 @@ class MultiPlotCallback(KeyedCallback):
 
         t = self.batch / self.datasize + self.epoch
 
+
         data = np.array([self.ema[k] for k in self.keys])
         data = np.expand_dims(data, 1)
         self._api.line(data, [t], update="append", win=self.win, opts=self._opts)

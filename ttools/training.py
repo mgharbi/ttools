@@ -277,16 +277,21 @@ class Checkpointer(object):
     Args:
       root (string): path to the root directory where the files are stored.
       model (torch.nn.Module):
-      optimizer (torch.optimizer):
+      optimizers (list of torch.optimizer): optimizers whose parameters will
+        be checkpointed together with the model.
       meta (dict):
     """
 
     EXTENSION = ".pth"
 
-    def __init__(self, root, model=None, meta=None, prefix=None):
+    def __init__(self, root, model=None, meta=None, optimizers=None, prefix=None):
         self.root = root
         self.model = model
         self.meta = meta
+
+        if optimizers is not None and not isinstance(optimizers, list):
+            raise ValueError("optimizers should be a list or None")
+        self.optimizers = optimizers
 
         LOG.debug(self)
 
@@ -316,11 +321,17 @@ class Checkpointer(object):
             LOG.debug("Saving model state dict")
             model_state = self.model.state_dict()
 
+        opt_dicts = []
+        if self.optimizers is not None:
+            for opt in self.optimizers:
+                opt_dicts.append(opt.state_dict())
+
         filename = self.__path(path, prefix=self.prefix)
         os.makedirs(self.root, exist_ok=True)
         th.save({'model': model_state,
                  'meta': self.meta,
                  'extras': extras,
+                 'optimizers': opt_dicts,
                  }, filename)
         LOG.debug("Checkpoint saved to \"{}\"".format(filename))
 
@@ -361,6 +372,16 @@ class Checkpointer(object):
         if self.model is not None and chkpt["model"] is not None:
             LOG.debug("Loading model state dict")
             self.model.load_state_dict(chkpt["model"])
+
+        if "optimizers" in chkpt.keys():
+            if self.optimizers is not None and chkpt["optimizers"] is not None:
+                try:
+                    for opt, state in zip(self.optimizers, chkpt["optimizers"]):
+                        LOG.debug("Loading optimizers state dict for %s", opt)
+                        opt.load_state_dict(state)
+                except:
+                    # We do raise an error here, e.g. in case the user simply changes optimizer
+                    LOG.warning("Could not load optimizer state dicts, starting from scratch")
 
         LOG.debug("Loaded checkpoint \"{}\"".format(filename))
         return tuple(chkpt[k] for k in ["extras", "meta"])
@@ -414,6 +435,6 @@ class Checkpointer(object):
     def load_meta(root, prefix=None):
         """Fetch model metadata without touching the saved parameters."""
         chkptr = Checkpointer(root, model=None, meta=None, prefix=prefix)
-        print(chkptr.sorted_checkpoints())
+        LOG.debug("checkpoints: %s", chkptr.sorted_checkpoints())
         _, meta = chkptr.load_latest()
         return meta
