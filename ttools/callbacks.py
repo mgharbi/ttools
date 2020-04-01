@@ -134,7 +134,7 @@ class VisdomLoggingCallback(KeyedCallback):
             keys=keys, val_keys=val_keys, smoothing=smoothing)
         if server is None:
             server = "http://localhost"
-        self._api = visdom.Visdom(server=server, port=port, env=env
+        self._api = visdom.Visdom(server=server, port=port, env=env,
                                   base_url=base_url)
 
         self._opts = {}
