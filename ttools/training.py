@@ -47,6 +47,7 @@ class BasicArgumentParser(argparse.ArgumentParser):
                           dest="cuda", help="Force CPU")
 
         self.add_argument("--server", help="Visdom server url")
+        self.add_argument("--base_url", help="Visdom base url")
         self.add_argument("--env", default="main", help="Visdom environment")
         self.add_argument("--port", default=8097, type=int,
                           help="Visdom server port")

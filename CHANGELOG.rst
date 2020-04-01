@@ -1,3 +1,8 @@
+0.0.31
+------
+
+- Adds a base_url parameter to visdom callbacks
+
 0.0.30
 ------
 

@@ -128,13 +128,14 @@ class VisdomLoggingCallback(KeyedCallback):
         0.0 disables smoothing.
     """
 
-    def __init__(self, keys=None, val_keys=None, frequency=100, server=None, port=8097,
-                 env="main", log=False, smoothing=0.99):
+    def __init__(self, keys=None, val_keys=None, frequency=100, server=None, 
+                 port=8097, base_url="/", env="main", log=False, smoothing=0.99):
         super(VisdomLoggingCallback, self).__init__(
             keys=keys, val_keys=val_keys, smoothing=smoothing)
         if server is None:
             server = "http://localhost"
-        self._api = visdom.Visdom(server=server, port=port, env=env)
+        self._api = visdom.Visdom(server=server, port=port, env=env
+                                  base_url=base_url)
 
         self._opts = {}
 
@@ -196,12 +197,13 @@ class MultiPlotCallback(KeyedCallback):
     """
 
     def __init__(self, keys=None, val_keys=None, frequency=100, server=None, port=8097,
-                 env="main", log=False, smoothing=0.99, win=None):
+                 env="main", base_url="/", log=False, smoothing=0.99, win=None):
         super(MultiPlotCallback, self).__init__(
             keys=keys, val_keys=val_keys, smoothing=smoothing)
         if server is None:
             server = "http://localhost"
-        self._api = visdom.Visdom(server=server, port=port, env=env)
+        self._api = visdom.Visdom(server=server, port=port, env=env,
+                                  base_url=base_url)
 
         if win is None:
             self.win = _random_string()
@@ -502,12 +504,14 @@ class ImageDisplayCallback(Callback, abc.ABC):
       env (string): name of the Visdom environment to log to.
     """
 
-    def __init__(self, frequency=100, server=None, port=8097, env="main", win=None):
+    def __init__(self, frequency=100, server=None, port=8097, env="main",
+                 base_url="/", win=None):
         super(ImageDisplayCallback, self).__init__()
         self.freq = frequency
         if server is None:
             server = "http://localhost"
-        self._api = visdom.Visdom(server=server, port=port, env=env)
+        self._api = visdom.Visdom(server=server, port=port, env=env,
+                                  base_url=base_url)
         self._step = 0
         if win is None:
             self.win = _random_string()
