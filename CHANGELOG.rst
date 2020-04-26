@@ -1,3 +1,8 @@
+0.0.34
+------
+
+- Adds conv-based bilinear and bicubic upsampling
+
 0.0.33
 ------
 
