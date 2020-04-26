@@ -205,7 +205,7 @@ class BicubicUpsampler(th.nn.Module):
     absx = th.abs(k_coord)
     absx2 = absx.pow(2)
     absx3 = absx.pow(3)
-    k_weight = th.zeros_like(absx)
+    k_weight = th.zeros(ksize)
     k_weight += (-0.5*absx3 + 2.5*absx2 - 4*absx + 2.0) * ((absx > 1.0) & (absx < 2.0))
     k_weight += (1.5*absx3 - 2.5*absx2 + 1.0) * (absx <= 1.0)
 
