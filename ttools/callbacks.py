@@ -214,13 +214,7 @@ class MultiPlotCallback(KeyedCallback):
             self._api.close(win)
 
         # Cleanup previous plots and setup options
-        all_keys = set(self.keys + self.val_keys)
-        legend = []
-        for k in list(all_keys):
-            if k in self.keys:
-                legend.append(k)
-            if k in self.val_keys:
-                legend.append(k + "_val")
+        legend = self.keys
 
         self._opts = {
             "legend": legend,
@@ -242,7 +236,6 @@ class MultiPlotCallback(KeyedCallback):
         self._step = 0
 
         t = self.batch / self.datasize + self.epoch
-
 
         data = np.array([self.ema[k] for k in self.keys])
         data = np.expand_dims(data, 1)

@@ -1,3 +1,8 @@
+0.0.35
+------
+
+- Fix multiplot callback
+
 0.0.34
 ------
 
