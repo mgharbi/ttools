@@ -495,7 +495,7 @@ class FixupResidualChain(nn.Module):
         assert (isinstance(ksize, int) and ksize > 0) or isinstance(
             ksize, list), "Kernel size should be a positive integer or a list of integers"
         assert isinstance(
-            depth, int) and depth > 0 and depth < 16, "Depth should be a positive integer lower than 16"
+            depth, int) and depth > 0, "Depth should be a positive integer"
 
         self.depth = depth
 

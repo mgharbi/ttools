@@ -60,6 +60,10 @@ class BasicArgumentParser(argparse.ArgumentParser):
 class ModelInterface(metaclass=ABCMeta):
     """An adapter to run or train a model."""
 
+    # TODO(mgharbi): it might make sense to refactor fwd/bwd as:
+    # - train step
+    # - evaluation step
+
     def __init__(self):
         pass
 
@@ -177,18 +181,25 @@ class Trainer(object):
         LOG.debug("Adding callback {}".format(callback))
         self.callbacks.append(callback)
 
-    def train(self, dataloader, num_epochs=None, val_dataloader=None):
+    def train(self, dataloader, starting_epoch=None, num_epochs=None, val_dataloader=None):
         """Main training loop. This starts the training procedure.
 
         Args:
           dataloader (DataLoader): loader that yields training batches.
+          starting_epoch (int, optional): index of the epoch we are starting from.
           num_epochs (int, optional): max number of epochs to run.
           val_dataloader (DataLoader, optional): loader that yields validation
             batches
         """
         self.__training_start(dataloader)
-        epoch = 0
-        while num_epochs is None or epoch < num_epochs:
+        if starting_epoch is None:
+            starting_epoch = 0
+
+        LOG.info("Starting taining from epoch %d", starting_epoch)
+
+        epoch = starting_epoch
+
+        while num_epochs is None or epoch < starting_epoch + num_epochs:
             self.__epoch_start(epoch)
             for batch_idx, batch in enumerate(dataloader):
                 if not self._keep_running:
@@ -278,21 +289,40 @@ class Checkpointer(object):
     Args:
       root (string): path to the root directory where the files are stored.
       model (torch.nn.Module):
-      optimizers (list of torch.optimizer): optimizers whose parameters will
+      meta (dict): a dictionary of training or configuration parameters useful
+          to initialize the model upon loading the checkpoint again.
+      optimizers (single or list of torch.optimizer): optimizers whose parameters will
         be checkpointed together with the model.
-      meta (dict):
+      schedulers (single or list of
+      torch.optim.lr_scheduler): schedulers whose
+          parameters will be checkpointed together with
+          the model.
+      prefix (str): unique prefix name in case several models are stored in the
+        same folder.
     """
 
     EXTENSION = ".pth"
 
-    def __init__(self, root, model=None, meta=None, optimizers=None, prefix=None):
+    def __init__(self, root, model=None, meta=None, optimizers=None,
+                 schedulers=None,
+                 prefix=None):
         self.root = root
         self.model = model
         self.meta = meta
 
-        if optimizers is not None and not isinstance(optimizers, list):
-            raise ValueError("optimizers should be a list or None")
+        # TODO(mgharbi): verify the prefixes are unique.
+
+        if optimizers is None:
+            LOG.warning("No optimizer state will be stored in the checkpointer")
+        else:
+            # if we have only one optimizer, make it a list
+            if not isinstance(optimizers, list):
+                optimizers = [optimizers]
         self.optimizers = optimizers
+        if schedulers is not None:
+            if not isinstance(schedulers, list):
+                schedulers = [schedulers]
+        self.schedulers = schedulers
 
         LOG.debug(self)
 
@@ -327,12 +357,18 @@ class Checkpointer(object):
             for opt in self.optimizers:
                 opt_dicts.append(opt.state_dict())
 
+        sched_dicts = []
+        if self.schedulers is not None:
+            for s in self.schedulers:
+                sched_dicts.append(s.state_dict())
+
         filename = self.__path(path, prefix=self.prefix)
         os.makedirs(self.root, exist_ok=True)
         th.save({'model': model_state,
                  'meta': self.meta,
                  'extras': extras,
                  'optimizers': opt_dicts,
+                 'schedulers': sched_dicts,
                  }, filename)
         LOG.debug("Checkpoint saved to \"{}\"".format(filename))
 
@@ -377,12 +413,26 @@ class Checkpointer(object):
         if "optimizers" in chkpt.keys():
             if self.optimizers is not None and chkpt["optimizers"] is not None:
                 try:
-                    for opt, state in zip(self.optimizers, chkpt["optimizers"]):
+                    for opt, state in zip(self.optimizers,
+                                          chkpt["optimizers"]):
                         LOG.debug("Loading optimizers state dict for %s", opt)
                         opt.load_state_dict(state)
                 except:
-                    # We do raise an error here, e.g. in case the user simply changes optimizer
-                    LOG.warning("Could not load optimizer state dicts, starting from scratch")
+                    # We do not raise an error here, e.g. in case the user simply
+                    # changes optimizer
+                    LOG.warning("Could not load optimizer state dicts, "
+                                "starting from scratch")
+
+        if "schedulers" in chkpt.keys():
+            if self.schedulers is not None and chkpt["schedulers"] is not None:
+                try:
+                    for s, state in zip(self.schedulers,
+                                          chkpt["schedulers"]):
+                        LOG.debug("Loading scheduler state dict for %s", s)
+                        s.load_state_dict(state)
+                except:
+                    LOG.warning("Could not load scheduler state dicts, "
+                                "starting from scratch")
 
         LOG.debug("Loaded checkpoint \"{}\"".format(filename))
         return tuple(chkpt[k] for k in ["extras", "meta"])
@@ -434,7 +484,16 @@ class Checkpointer(object):
 
     @staticmethod
     def load_meta(root, prefix=None):
-        """Fetch model metadata without touching the saved parameters."""
+        """Fetch model metadata without touching the saved parameters.
+
+        This loads the metadata from the most recent checkpoint in the root
+        directory.
+
+        Args:
+            root(str): path to the root directory containing the checkpoints
+            prefix(str): unique prefix for the checkpoint to be loaded (e.g. if
+                multiple models are saved in the same location)
+        """
         chkptr = Checkpointer(root, model=None, meta=None, prefix=prefix)
         LOG.debug("checkpoints: %s", chkptr.sorted_checkpoints())
         _, meta = chkptr.load_latest()

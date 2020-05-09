@@ -350,7 +350,7 @@ class ProgressBarCallback(KeyedCallback):
     def epoch_start(self, epoch):
         super(ProgressBarCallback, self).epoch_start(epoch)
         self.pbar = tqdm(total=self.datasize, unit=" batches",
-                         desc="Epoch {}".format(self.epoch + 1))
+                         desc="Epoch {}".format(self.epoch))
 
     def epoch_end(self):
         super(ProgressBarCallback, self).epoch_end()
@@ -361,7 +361,7 @@ class ProgressBarCallback(KeyedCallback):
         super(ProgressBarCallback, self).validation_start(dataloader)
         print("Running validation...")
         self.pbar = tqdm(total=len(dataloader), unit=" batches",
-                         desc="Validation {}".format(self.epoch + 1))
+                         desc="Validation {}".format(self.epoch))
 
     def validation_step(self, batch, fwd_data, val_data):
         self.pbar.update(1)
@@ -371,7 +371,7 @@ class ProgressBarCallback(KeyedCallback):
         self.pbar.close()
         self.pbar = None
         s = " "*ProgressBarCallback.TABSTOPS + "Validation {} | ".format(
-            self.epoch + 1)
+            self.epoch)
         for k in self.val_keys:
             s += "{} = {:.2f} ".format(k, val_data[k])
         print(s)
@@ -392,8 +392,6 @@ class CheckpointingCallback(Callback):
 
     Args:
       checkpointer (Checkpointer): actual checkpointer responsible for the I/O.
-      start_epoch (int or None): index of the starting epoch (e.g. when
-          resuming from a previous checkpoint).
       interval (int, optional): minimum time in seconds between periodic
           checkpoints (within an epoch). There is not periodic checkpoint if
           this value is None.
@@ -406,7 +404,7 @@ class CheckpointingCallback(Callback):
     PERIODIC_PREFIX = "periodic_"
     EPOCH_PREFIX = "epoch_"
 
-    def __init__(self, checkpointer, start_epoch=None, interval=600,
+    def __init__(self, checkpointer, interval=600,
                  max_files=5, max_epochs=10):
         super(CheckpointingCallback, self).__init__()
         self.checkpointer = checkpointer
@@ -416,24 +414,16 @@ class CheckpointingCallback(Callback):
 
         self.last_checkpoint_time = time.time()
 
-        if start_epoch is None:
-            self.start_epoch = 0
-        else:
-            self.start_epoch = start_epoch
-
-    def get_extras(self):
-        return {"epoch": self.epoch + self.start_epoch}
-
     def epoch_end(self):
         """Save a checkpoint at the end of each epoch."""
         super(CheckpointingCallback, self).epoch_end()
         path = "{}{}".format(CheckpointingCallback.EPOCH_PREFIX, self.epoch)
-        self.checkpointer.save(path, extras=self.get_extras())
+        self.checkpointer.save(path, extras={"epoch": self.epoch + 1})
         self.__purge_old_files()
 
     def training_end(self):
         super(CheckpointingCallback, self).training_end()
-        self.checkpointer.save("training_end", extras=self.get_extras())
+        self.checkpointer.save("training_end", extras={"epoch": self.epoch + 1})
 
     def batch_end(self, batch_data, fwd_result, bwd_result):
         """Save a periodic checkpoint if requested."""
@@ -456,7 +446,7 @@ class CheckpointingCallback(Callback):
 
         filename = "{}{}".format(CheckpointingCallback.PERIODIC_PREFIX,
                                    time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime()))
-        self.checkpointer.save(filename, extras=self.get_extras())
+        self.checkpointer.save(filename, extras={"epoch": self.epoch})
         self.__purge_old_files()
 
     def __purge_old_files(self):
@@ -716,3 +706,19 @@ class TensorBoardImageDisplayCallback(Callback, abc.ABC):
         t = self.datasize * (self.epoch+1)
         self._val_writer.add_image(self.tag(), make_grid(viz), t)
         self.first_step = False
+
+
+class LRSchedulerCallback(Callback):
+    """
+    Args:
+        schedulers: th.optim.Scheduler or list.
+    """
+    def __init__(self, schedulers):
+        # Make it a list
+        if not isinstance(schedulers, list):
+            schedulers = [schedulers]
+        self.schedulers = schedulers
+
+    def epoch_end(self):
+        for s in self.schedulers:
+            s.step()
