@@ -1,3 +1,8 @@
+0.0.36
+------
+
+- Adds a scheduler callback and option to save its state in the callback
+
 0.0.35
 ------
 
