@@ -32,7 +32,15 @@ LOG = logging.getLogger(__name__)
 
 
 class Callback(object):
-    """Base class for all training callbacks."""
+    """Base class for all training callbacks.
+
+    Attributes:
+        epoch(int): current epoch index.
+        batch(int): current batch index.
+        datasize(int): number of batches in the training dataset.
+        val_datasize(int): number of batches in the validation dataset.
+        model_interface(ttools.ModelInterface): parent interface driving the training.
+    """
 
     def __repr__(self):
         return self.__class__.__name__
@@ -41,17 +49,29 @@ class Callback(object):
         super(Callback, self).__init__()
         self.epoch = 0
         self.batch = 0
+        self.val_batch = 0
         self.datasize = 0
         self.val_datasize = 0
+        self.model_interface = None
 
     def training_start(self, dataloader):
+        """Hook to execute code when the training begins.
+
+        Args:
+            dataloader(th.utils.data.Dataloader): a data loading class that
+            provides batches of data for training.
+        """
         self.datasize = len(dataloader)
 
     def training_end(self):
+        """Hook to execute code when the training ends."""
         pass
 
     def epoch_start(self, epoch):
         """Hook to execute code when a new epoch starts.
+
+        Args:
+            epoch(int): index of the current epoch.
 
         Note: self.epoch is never incremented. Instead, it should be set by the
         caller.
@@ -61,24 +81,60 @@ class Callback(object):
     def epoch_end(self):
         """Hook to execute code when an epoch ends.
 
-        Note: self.epoch is never incremented, but it is set externally in
-        `epoch_start`.
+        NOTE: self.epoch is not incremented. Instead it is set externally in
+        the `epoch_start` method.
         """
         pass
 
     def validation_start(self, dataloader):
+        """Hook to execute code when a validation run starts.
+
+        Args:
+            dataloader(th.utils.data.Dataloader): a data loading class that
+            provides batches of data for evaluation.
+        """
         self.val_datasize = len(dataloader)
 
-    def validation_step(self, batch, fwd_data, val_data):
-        pass
-
     def validation_end(self, val_data):
+        """Hook to execute code when a validation run ends."""
         pass
 
-    def batch_start(self, batch, batch_data):
-        self.batch = batch
+    def batch_start(self, batch_idx, batch_data):
+        """Hook to execute code when a training step starts.
 
-    def batch_end(self, batch_data, fwd_result, bwd_result):
+        Args:
+            batch_idx(int): index of the current batch.
+            batch_data: a Tensor, tuple of dict with the current batch of data.
+        """
+        self.batch = batch_idx
+
+    def batch_end(self, batch_data, train_step_data):
+        """Hook to execute code when a training step ends.
+
+        Args:
+            batch_data: a Tensor, tuple of dict with the current batch of data.
+            train_setp_data(dict): outputs from the `training_step` of a
+                ModelInterface.
+        """
+        pass
+
+    def val_batch_start(self, batch_idx, batch_data):
+        """Hook to execute code when a validation step starts.
+
+        Args:
+            batch_idx(int): index of the current batch.
+            batch_data: a Tensor, tuple of dict with the current batch of data.
+        """
+        self.val_batch = batch_idx
+
+    def val_batch_end(self, batch_data, running_val_data):
+        """Hook to execute code when a validation step ends.
+
+        Args:
+            batch_data: a Tensor, tuple of dict with the current batch of data.
+            train_setp_data(dict): running outputs produced by the `validation_step` of a
+                ModelInterface.
+        """
         pass
 
 
@@ -94,7 +150,7 @@ class KeyedCallback(Callback):
       val_keys (list of str): list of keys whose values will be logged during validation
     """
 
-    def __init__(self, keys=None, val_keys=None, smoothing=0.99):
+    def __init__(self, keys=None, val_keys=None, smoothing=0.999):
         super(KeyedCallback, self).__init__()
         if keys is None:
             self.keys = ["loss"]
@@ -103,15 +159,15 @@ class KeyedCallback(Callback):
 
         if val_keys is None:
             self.val_keys = [] 
-            # self.val_keys = self.keys
         else:
             self.val_keys = val_keys
 
+        # Only smooth the training keys
         self.ema = ExponentialMovingAverage(self.keys, alpha=smoothing)
 
-    def batch_end(self, batch_data, fwd, bwd):
+    def batch_end(self, batch_data, train_step_data):
         for k in self.keys:
-            self.ema.update(k, bwd[k])
+            self.ema.update(k, train_step_data[k])
 
 
 class VisdomLoggingCallback(KeyedCallback):
@@ -157,8 +213,8 @@ class VisdomLoggingCallback(KeyedCallback):
         self._step = 0
         self.frequency = frequency
 
-    def batch_end(self, batch_data, fwd, bwd):
-        super(VisdomLoggingCallback, self).batch_end(batch_data, fwd, bwd)
+    def batch_end(self, batch_data, train_step_data):
+        super(VisdomLoggingCallback, self).batch_end(batch_data, train_step_data)
 
         if self._step % self.frequency != 0:
             self._step += 1
@@ -168,8 +224,8 @@ class VisdomLoggingCallback(KeyedCallback):
         t = self.batch / self.datasize + self.epoch
 
         for k in self.keys:
-            self._api.line([self.ema[k]], [t], update="append", win=k, name="train",
-                           opts=self._opts[k])
+            self._api.line([self.ema[k]], [t], update="append", win=k,
+                           name="train", opts=self._opts[k])
 
         self._step += 1
 
@@ -221,14 +277,15 @@ class MultiPlotCallback(KeyedCallback):
             "title": self.win,
             "xlabel": "epoch",
         }
+
         if log:
             self._opts["ytype"] = "log"
 
         self._step = 0
         self.frequency = frequency
 
-    def batch_end(self, batch_data, fwd, bwd):
-        super(MultiPlotCallback, self).batch_end(batch_data, fwd, bwd)
+    def batch_end(self, batch_data, train_step_data):
+        super(MultiPlotCallback, self).batch_end(batch_data, train_step_data)
 
         if self._step % self.frequency != 0:
             self._step += 1
@@ -243,8 +300,8 @@ class MultiPlotCallback(KeyedCallback):
 
         self._step += 1
 
-    def validation_end(self, val_data):
-        pass
+    # def validation_end(self, val_data):
+    #     pass
         # super(MultiPlotCallback, self).validation_end(val_data)
         # t = self.epoch + 1
         # for k in self.val_keys:
@@ -312,9 +369,9 @@ class LoggingCallback(KeyedCallback):
         self.__print(s)
         self.__unindent()
 
-    def batch_end(self, batch_data, fwd, bwd_data):
+    def batch_end(self, batch_data, train_step_data):
         """Logs training advancement Epoch.Batch"""
-        super(LoggingCallback, self).batch_end(batch_data, fwd, bwd_data)
+        super(LoggingCallback, self).batch_end(batch_data, train_step_data)
 
         if self._step % self.frequency != 0:
             self._step += 1
@@ -323,8 +380,7 @@ class LoggingCallback(KeyedCallback):
 
         s = "Step {}.{}".format(self.epoch + 1, self.batch + 1)
         for k in self.keys:
-            print(bwd_data)
-            value = bwd_data[k]
+            value = train_step_data[k]
             if value is not None:
                 s += " | {} = {:.2f}".format(k, value)
         self.__print(s)
@@ -336,7 +392,8 @@ class ProgressBarCallback(KeyedCallback):
     """A progress bar optimization logger."""
 
     def __init__(self, keys=None, val_keys=None, smoothing=0.99):
-        super(ProgressBarCallback, self).__init__(keys=keys, val_keys=val_keys, smoothing=smoothing)
+        super(ProgressBarCallback, self).__init__(
+            keys=keys, val_keys=val_keys, smoothing=smoothing)
         self.pbar = None
 
     def training_start(self, dataloader):
@@ -363,7 +420,7 @@ class ProgressBarCallback(KeyedCallback):
         self.pbar = tqdm(total=len(dataloader), unit=" batches",
                          desc="Validation {}".format(self.epoch))
 
-    def validation_step(self, batch, fwd_data, val_data):
+    def val_batch_end(self, batch, running_val_data):
         self.pbar.update(1)
 
     def validation_end(self, val_data):
@@ -376,8 +433,8 @@ class ProgressBarCallback(KeyedCallback):
             s += "{} = {:.2f} ".format(k, val_data[k])
         print(s)
 
-    def batch_end(self, batch_data, fwd, bwd_data):
-        super(ProgressBarCallback, self).batch_end(batch_data, fwd, bwd_data)
+    def batch_end(self, batch_data, train_step_data):
+        super(ProgressBarCallback, self).batch_end(batch_data, train_step_data)
         d = {}
         for k in self.keys:
             d[k] = self.ema[k]
@@ -425,11 +482,11 @@ class CheckpointingCallback(Callback):
         super(CheckpointingCallback, self).training_end()
         self.checkpointer.save("training_end", extras={"epoch": self.epoch + 1})
 
-    def batch_end(self, batch_data, fwd_result, bwd_result):
+    def batch_end(self, batch_data, train_step_data):
         """Save a periodic checkpoint if requested."""
 
         super(CheckpointingCallback, self).batch_end(
-            batch_data, fwd_result, bwd_result)
+            batch_data, train_step_data)
 
         if self.interval is None:  # We skip periodic checkpoints
             return
@@ -501,35 +558,37 @@ class ImageDisplayCallback(Callback, abc.ABC):
         else:
             self.win = win
 
+        self.first_validation_step = None
+
     @abc.abstractmethod
-    def visualized_image(self, batch, fwd_result):
+    def visualized_image(self, batch, train_step_data):
         pass
 
-    def caption(self, batch, fwd_result):
+    def caption(self, batch, train_step_data):
         return ""
 
-    def batch_end(self, batch, fwd_result, bwd_result):
+    def batch_end(self, batch, train_step_data):
         if self._step % self.freq != 0:
             self._step += 1
             return
 
         self._step = 0
 
-        caption = self.caption(batch, fwd_result)
+        caption = self.caption(batch, train_step_data)
         opts = {"caption": "Epoch {}, batch {}: {}".format(
             self.epoch, self.batch, caption)}
 
-        viz = self.visualized_image(batch, fwd_result)
+        viz = self.visualized_image(batch, train_step_data)
         self._api.images(viz, win=self.win, opts=opts)
         self._step += 1
 
     def validation_start(self, dataloader):
         super(ImageDisplayCallback, self).validation_start(dataloader)
-        self.first_step = True
+        self.first_validation_step = True
 
-    def validation_step(self, batch, fwd_data, val_data):
-        super(ImageDisplayCallback, self).validation_step(batch, fwd_data, val_data)
-        if not self.first_step:
+    def val_batch_end(self, batch, running_val_data):
+        super(ImageDisplayCallback, self).val_batch_end(batch, running_val_data)
+        if not self.first_validation_step:
             return
 
         caption = self.caption(batch, fwd_data)
@@ -538,7 +597,7 @@ class ImageDisplayCallback(Callback, abc.ABC):
 
         viz = self.visualized_image(batch, fwd_data)
         self._api.images(viz, win=self.win+"_val", opts=opts)
-        self.first_step = False
+        self.first_validation_step = False
 
 
 class ExperimentLoggerCallback(Callback):
@@ -587,12 +646,12 @@ class CSVLoggingCallback(KeyedCallback):
         self.fid.write(",,logger_deleted,,\n")
         self.fid.close()
 
-    def batch_end(self, batch_data, fwd, bwd_data):
+    def batch_end(self, batch_data, train_step_data):
         """Logs training advancement Batch"""
-        super(CSVLoggingCallback, self).batch_end(batch_data, fwd, bwd_data)
+        super(CSVLoggingCallback, self).batch_end(batch_data, train_step_data)
 
         for k in self.keys:
-            v = bwd_data[k]
+            v = train_step_data[k]
             self.fid.write("%d,%d,batch_end,%s,%f\n" % (self.epoch, self.batch, k, v))
 
     def training_start(self, dataloader):
@@ -629,8 +688,8 @@ class TensorBoardLoggingCallback(Callback):
         self.frequency = frequency
         self.summary_type = summary_type
 
-    def batch_end(self, batch_data, fwd, bwd):
-        super(TensorBoardLoggingCallback, self).batch_end(batch_data, fwd, bwd)
+    def batch_end(self, batch_data, train_step_data):
+        super(TensorBoardLoggingCallback, self).batch_end(batch_data, train_step_data)
 
         if self._step % self.frequency != 0:
             self._step += 1
@@ -641,9 +700,9 @@ class TensorBoardLoggingCallback(Callback):
 
         for k in self.keys:
             if self.summary_type == 'scalar':
-                self._writer.add_scalar(k, bwd[k], global_step=t)
+                self._writer.add_scalar(k, train_step_data[k], global_step=t)
             elif self.summary_type == 'histogram':
-                self._writer.add_histogram(k, bwd[k], global_step=t)
+                self._writer.add_histogram(k, train_step_data[k], global_step=t)
         self._step += 1
 
     def validation_end(self, val_data):
@@ -674,21 +733,21 @@ class TensorBoardImageDisplayCallback(Callback, abc.ABC):
         self._step = 0
 
     @abc.abstractmethod
-    def visualized_image(self, batch, fwd_result):
+    def visualized_image(self, batch, train_step_data):
         pass
 
     @abc.abstractmethod
     def tag(self):
         pass
 
-    def batch_end(self, batch, fwd_result, bwd_result):
+    def batch_end(self, batch, train_step_data):
         if self._step % self.freq != 0:
             self._step += 1
             return
 
         self._step = 0
 
-        viz = self.visualized_image(batch, fwd_result)
+        viz = self.visualized_image(batch, train_step_data)
         t = self.batch + self.datasize * self.epoch
         self._writer.add_image(self.tag(), make_grid(viz), t)
         self._step += 1
@@ -697,8 +756,8 @@ class TensorBoardImageDisplayCallback(Callback, abc.ABC):
         super(TensorBoardImageDisplayCallback, self).validation_start(dataloader)
         self.first_step = True
 
-    def validation_step(self, batch, fwd_data, val_data):
-        super(TensorBoardImageDisplayCallback, self).validation_step(batch, fwd_data, val_data)
+    def val_batch_end(self, batch, running_val_data):
+        super(TensorBoardImageDisplayCallback, self).val_batch_end(batch, running_val_data)
         if not self.first_step:
             return
 

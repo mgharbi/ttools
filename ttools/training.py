@@ -60,43 +60,39 @@ class BasicArgumentParser(argparse.ArgumentParser):
 class ModelInterface(metaclass=ABCMeta):
     """An adapter to run or train a model."""
 
-    # TODO(mgharbi): it might make sense to refactor fwd/bwd as:
-    # - train step
-    # - evaluation step
-
     def __init__(self):
         pass
 
     @abstractmethod
-    def forward(self, batch):
-        """Runs the model on a batch of data.
+    def training_step(self, batch):
+        """Training step given a batch of data.
+
+        This should implement a forward pass of the model, compute gradients,
+        take an optimizer step and return useful metrics and tensors for
+        visualization and training callbacks. 
 
         Args:
           batch (dict): batch of data provided by a data pipeline.
 
         Returns:
-          forward_data (dict): a dictionary of outputs
+          train_step_data (dict): a dictionary of outputs.
         """
+        return {}
 
-        forward_data = {}
+    def validation_step(self, batch, running_val_data):
+        """Updates the running validataion with the current batch's results.
 
-        return forward_data
-
-    @abstractmethod
-    def backward(self, batch, forward_data):
-        """Computes gradients, take an optimizer step and update the model.
+        The default implementation is a no-op
 
         Args:
           batch (dict): batch of data provided by a data pipeline.
-          forward_data (dict): outputs from the forward pass
+          running_val_data (dict): current aggregates of the validation loop.
 
         Returns:
-          backward_data (dict): a dictionary of outputs
+          updated_data (dict): new updated value for the running_val_data.
         """
-
-        backward_data = {}
-
-        return backward_data
+        LOG.warning("Running a ModelInterface validation step that was not overriden: this is a no-op.")
+        return {}
 
     def init_validation(self):
         """Initializes the quantities to be reported during validation.
@@ -106,40 +102,9 @@ class ModelInterface(metaclass=ABCMeta):
         Returns:
           data (dict): initialized values
         """
-
+        LOG.warning("Running a ModelInterface validation initialization that was not overriden: this is a no-op.")
         data = {}
         return data
-
-    def update_validation(self, batch, fwd, running_data):
-        """Updates the running val data using the current batch's forward output.
-
-        The default implementation is a no-op
-
-        Args:
-          batch (dict): batch of data provided by a data pipeline.
-          fwd (dict): data from one forward step in validation mode
-          running_data (dict): current aggregates of the validation loop.
-
-        Returns:
-          updated_data (dict): initialized values
-        """
-
-        updated_data = {}
-        return updated_data
-
-    def finalize_validation(self, running_data):
-        """Computes the final validation aggregates from the running data.
-
-        The default implementation is a no-op
-
-        Args:
-          running_data (dict): current aggregates of the validation loop.
-
-        Returns:
-          validation_data (dict): initialized values
-        """
-
-        return running_data
 
     def __repr__(self):
         return self.__class__.__name__
@@ -168,6 +133,7 @@ class Trainer(object):
         self._keep_running = True
 
     def interrupt_handler(self, signo, frame):
+        """Stop the training process upon receiving a SIGINT (Ctrl+C)."""
         LOG.debug("interrupting run")
         self._keep_running = False
 
@@ -177,8 +143,14 @@ class Trainer(object):
         self.__training_end()
 
     def add_callback(self, callback):
-        """Adds a callback to the list of training hooks."""
+        """Adds a callback to the list of training hooks.
+
+        Args:
+            callback(ttools.Callback): callback to add.
+        """
         LOG.debug("Adding callback {}".format(callback))
+        # pass an interface reference to the callback
+        callback.model_interface = self.interface
         self.callbacks.append(callback)
 
     def train(self, dataloader, starting_epoch=None, num_epochs=None, val_dataloader=None):
@@ -206,24 +178,24 @@ class Trainer(object):
                     self._stop()
                     return
                 self.__batch_start(batch_idx, batch)
-                fwd_result = self.__forward_step(batch)
-                bwd_result = self.__backward_step(batch, fwd_result)
-                self.__batch_end(batch, fwd_result, bwd_result)
+                train_step_data = self.__training_step(batch)
+                self.__batch_end(batch, train_step_data)
             self.__epoch_end()
+
+            # TODO: allow validation at intermediate steps during one epoch
 
             # Validate
             if val_dataloader:
                 with th.no_grad():
-                    val_data = self.__validation_start(
-                        val_dataloader)  # data interface adapter
+                    running_val_data = self.__validation_start(val_dataloader)
                     for batch_idx, batch in enumerate(val_dataloader):
                         if not self._keep_running:
                             self._stop()
                             return
-                        fwd_result = self.__forward_step(batch)
-                        val_data = self.__validation_update(
-                            batch, fwd_result, val_data)
-                    self.__validation_end(val_data)
+                        self.__val_batch_start(batch_idx, batch)
+                        running_val_data = self.__validation_step(batch, running_val_data)
+                        self.__val_batch_end(batch, running_val_data)
+                    self.__validation_end(running_val_data)
 
             epoch += 1
 
@@ -236,12 +208,6 @@ class Trainer(object):
     def __repr__(self):
         return "Trainer({}, {} callbacks)".format(
             self.interface, len(self.callbacks))
-
-    def __forward_step(self, batch):
-        return self.interface.forward(batch)
-
-    def __backward_step(self, batch, forward_data):
-        return self.interface.backward(batch, forward_data)
 
     def __training_start(self, dataloader):
         for cb in self.callbacks:
@@ -259,28 +225,36 @@ class Trainer(object):
         for cb in self.callbacks:
             cb.epoch_end()
 
+    def __batch_start(self, batch_idx, batch):
+        for cb in self.callbacks:
+            cb.batch_start(batch_idx, batch)
+
+    def __batch_end(self, batch, train_step_data):
+        for cb in self.callbacks:
+            cb.batch_end(batch, train_step_data)
+
+    def __val_batch_start(self, batch_idx, batch):
+        for cb in self.callbacks:
+            cb.val_batch_start(batch_idx, batch)
+
+    def __val_batch_end(self, batch, running_val_data):
+        for cb in self.callbacks:
+            cb.val_batch_end(batch, running_val_data)
+
     def __validation_start(self, dataloader):
         for cb in self.callbacks:
             cb.validation_start(dataloader)
         return self.interface.init_validation()
 
-    def __validation_update(self, batch, fwd_data, val_data):
+    def __validation_end(self, running_val_data):
         for cb in self.callbacks:
-            cb.validation_step(batch, fwd_data, val_data)
-        return self.interface.update_validation(batch, fwd_data, val_data)
+            cb.validation_end(running_val_data)
 
-    def __validation_end(self, val_data):
-        val_data = self.interface.finalize_validation(val_data)
-        for cb in self.callbacks:
-            cb.validation_end(val_data)
+    def __training_step(self, batch):
+        return self.interface.training_step(batch)
 
-    def __batch_start(self, batch_idx, batch):
-        for cb in self.callbacks:
-            cb.batch_start(batch_idx, batch)
-
-    def __batch_end(self, batch, fwd_result, bwd_result):
-        for cb in self.callbacks:
-            cb.batch_end(batch, fwd_result, bwd_result)
+    def __validation_step(self, batch, running_val_data):
+        return self.interface.validation_step(batch, running_val_data)
 
 
 class Checkpointer(object):
@@ -304,8 +278,7 @@ class Checkpointer(object):
     EXTENSION = ".pth"
 
     def __init__(self, root, model=None, meta=None, optimizers=None,
-                 schedulers=None,
-                 prefix=None):
+                 schedulers=None, prefix=None):
         self.root = root
         self.model = model
         self.meta = meta
@@ -373,12 +346,20 @@ class Checkpointer(object):
         LOG.debug("Checkpoint saved to \"{}\"".format(filename))
 
     def try_and_init_from(self, path):
+        """Try to initialize the models's weights from an external checkpoint.
+
+        Args:
+            path(str): full path to the checkpoints to load model parameters
+                from.
+        """
         LOG.info("Loading weights from foreign checkpoint {}".format(path))
         if not os.path.exists(path):
             raise ValueError("Checkpoint {} does not exist".format(path))
+
         chkpt = th.load(path, map_location=th.device("cpu"))
         if "model" not in chkpt.keys() or chkpt["model"] is None:
             raise ValueError("{} has no model saved".format(path))
+
         mdl = chkpt["model"]
         for n, p in self.model.named_parameters():
             if n in mdl:
@@ -390,6 +371,7 @@ class Checkpointer(object):
                 p.data.copy_(p2)
             else:
                 LOG.warning("Parameter {} ignored, not found in source checkpoint.".format(n))
+
         LOG.info("Weights loaded from foreign checkpoint {}".format(path))
 
     def load(self, path):
@@ -441,7 +423,8 @@ class Checkpointer(object):
         """Try to load the most recent checkpoint, skip failing files.
 
         Returns:
-          extras (dict): extra information passed by the user at save time.
+          extras (dict): extra user-defined information that was saved in the
+              checkpoint.
           meta (dict): metaparameters of the model passed at save time.
         """
         all_checkpoints = self.sorted_checkpoints()
@@ -459,7 +442,11 @@ class Checkpointer(object):
         return extras, meta
 
     def sorted_checkpoints(self):
-        """Get list of all checkpoints in root directory, sorted by creation date."""
+        """Get list of all checkpoints in root directory, sorted by creation date.
+
+        Returns:
+            chkpts (list of str): sorted checkpoints in the root folder.
+        """
         reg = re.compile(r"{}.*\{}".format(self.prefix, Checkpointer.EXTENSION))
         if not os.path.exists(self.root):
             all_checkpoints = []
@@ -476,7 +463,11 @@ class Checkpointer(object):
         return chkpts
 
     def delete(self, path):
-        """Delete checkpoint at path."""
+        """Delete checkpoint at path.
+
+        Args:
+            path(str): full path to the checkpoint to delete.
+        """
         if path in self.sorted_checkpoints():
             os.remove(os.path.join(self.root, path))
         else:
