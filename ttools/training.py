@@ -79,6 +79,18 @@ class ModelInterface(metaclass=ABCMeta):
         """
         return {}
 
+    def init_validation(self):
+        """Initializes the quantities to be reported during validation.
+
+        The default implementation is a no-op
+
+        Returns:
+          data (dict): initialized values
+        """
+        LOG.warning("Running a ModelInterface validation initialization that was not overriden: this is a no-op.")
+        data = {}
+        return data
+
     def validation_step(self, batch, running_val_data):
         """Updates the running validataion with the current batch's results.
 
@@ -93,18 +105,6 @@ class ModelInterface(metaclass=ABCMeta):
         """
         LOG.warning("Running a ModelInterface validation step that was not overriden: this is a no-op.")
         return {}
-
-    def init_validation(self):
-        """Initializes the quantities to be reported during validation.
-
-        The default implementation is a no-op
-
-        Returns:
-          data (dict): initialized values
-        """
-        LOG.warning("Running a ModelInterface validation initialization that was not overriden: this is a no-op.")
-        data = {}
-        return data
 
     def __repr__(self):
         return self.__class__.__name__
@@ -153,7 +153,8 @@ class Trainer(object):
         callback.model_interface = self.interface
         self.callbacks.append(callback)
 
-    def train(self, dataloader, starting_epoch=None, num_epochs=None, val_dataloader=None):
+    def train(self, dataloader, starting_epoch=None, num_epochs=None,
+              val_dataloader=None):
         """Main training loop. This starts the training procedure.
 
         Args:

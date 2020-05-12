@@ -561,25 +561,40 @@ class ImageDisplayCallback(Callback, abc.ABC):
         self.first_validation_step = None
 
     @abc.abstractmethod
-    def visualized_image(self, batch, train_step_data):
-        pass
+    def visualized_image(self, batch, step_data, is_val=False):
+        """Produces the image to visualize.
 
-    def caption(self, batch, train_step_data):
+        Args:
+            batch(Tensor, dict or tuple): batch of data.
+            batch(dict): batch of data produced by a ModelInterface's
+               `training_step` method (when is_val=True) or `validation_step`
+               when is_val=False.
+            is_val(bool): if True, the current visualization is for a
+                validation step.
+
+        Returns:
+            th.Tensor with shape [bs, 1 or 3, h, w] or None: image to display.
+
+        """
+        return None
+
+    def caption(self, batch, step_data, is_val=False):
         return ""
 
-    def batch_end(self, batch, train_step_data):
+    def batch_end(self, batch, step_data):
         if self._step % self.freq != 0:
             self._step += 1
             return
 
         self._step = 0
 
-        caption = self.caption(batch, train_step_data)
+        caption = self.caption(batch, step_data, is_val=False)
         opts = {"caption": "Epoch {}, batch {}: {}".format(
             self.epoch, self.batch, caption)}
 
-        viz = self.visualized_image(batch, train_step_data)
-        self._api.images(viz, win=self.win, opts=opts)
+        viz = self.visualized_image(batch, step_data, is_val=False)
+        if viz is not None:
+            self._api.images(viz, win=self.win, opts=opts)
         self._step += 1
 
     def validation_start(self, dataloader):
@@ -588,15 +603,18 @@ class ImageDisplayCallback(Callback, abc.ABC):
 
     def val_batch_end(self, batch, running_val_data):
         super(ImageDisplayCallback, self).val_batch_end(batch, running_val_data)
+
+        # Only display the first validation image
         if not self.first_validation_step:
             return
 
-        caption = self.caption(batch, fwd_data)
+        caption = self.caption(batch, running_val_data, is_val=True)
         opts = {"caption": "Validation {}, batch {}: {}".format(
             self.epoch, self.batch, caption)}
 
-        viz = self.visualized_image(batch, fwd_data)
-        self._api.images(viz, win=self.win+"_val", opts=opts)
+        viz = self.visualized_image(batch, running_val_data, is_val=True)
+        if viz is not None:
+            self._api.images(viz, win=self.win+"_val", opts=opts)
         self.first_validation_step = False
 
 
@@ -761,7 +779,7 @@ class TensorBoardImageDisplayCallback(Callback, abc.ABC):
         if not self.first_step:
             return
 
-        viz = self.visualized_image(batch, fwd_data)
+        viz = self.visualized_image(batch, running_val_data)
         t = self.datasize * (self.epoch+1)
         self._val_writer.add_image(self.tag(), make_grid(viz), t)
         self.first_step = False
