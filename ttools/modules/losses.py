@@ -196,7 +196,7 @@ class ELPIPS(th.nn.Module):
     def xform(self, im, params):
         scale = params["scale"]
         im = th.nn.functional.interpolate(im, scale_factor=scale,
-                                          mode="bilinear")
+                                          mode="bilinear", align_corners=False)
 
         shift = params["shift"]
         im = im[..., shift[0]:, shift[1]:]
