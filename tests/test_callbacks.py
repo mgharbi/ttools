@@ -35,13 +35,13 @@ class TestLoggingCallback(unittest.TestCase):
     def testBatchLogging(self):
         cb = LoggingCallback(self.loggername, keys=["loss", "acc"], frequency=1)
         bwd = dict(loss=0.01, acc=0.99)
-        cb.batch_end(None, None, bwd)
+        cb.batch_end(None, bwd)
         log_contents = self.capture.getvalue()
         self.assertEqual(log_contents, "INFO, Step 1.1 | loss = 0.01 | acc = 0.99\n")
 
     def testNoneLogging(self):
         cb = LoggingCallback(self.loggername, keys=["loss", "acc"], frequency=1)
         bwd = dict(loss=None, acc=0.99)
-        cb.batch_end(None, None, bwd)
+        cb.batch_end(None, bwd)
         log_contents = self.capture.getvalue()
         self.assertEqual(log_contents, "INFO, Step 1.1 | acc = 0.99\n")

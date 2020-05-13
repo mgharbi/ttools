@@ -19,27 +19,16 @@ class DummyInterface(ModelInterface):
 
         self.init_val = 0
         self.update_val = 0
-        self.finalize_val = 0
 
-    def forward(self, batch):
-        super(DummyInterface, self).forward(batch)
+    def training_step(self, batch):
         self.fwd += 1
-
-    def backward(self, batch, fwd):
-        super(DummyInterface, self).backward(batch, fwd)
         self.bwd += 1
 
     def init_validation(self):
-        super(DummyInterface, self).init_validation()
         self.init_val += 1
 
-    def update_validation(self, batch, fwd, running):
-        super(DummyInterface, self).update_validation(batch, fwd, running)
+    def validation_step(self, batch, running):
         self.update_val += 1
-
-    def finalize_validation(self, running):
-        super(DummyInterface, self).finalize_validation(running)
-        self.finalize_val += 1
 
 
 class DummyCallback(Callback):
@@ -75,8 +64,8 @@ class DummyCallback(Callback):
         super(DummyCallback, self).validation_start(*args)
         self.val_starts += 1
 
-    def validation_step(self, *args):
-        super(DummyCallback, self).validation_step(*args)
+    def val_batch_end(self, *args):
+        super(DummyCallback, self).val_batch_end(*args)
         self.val_steps += 1
 
     def validation_end(self, *args):
@@ -147,14 +136,11 @@ class TestTrainer(unittest.TestCase):
         self.assertEqual(self.interface.bwd, epochs*len(self.data))
         self.assertEqual(self.interface.init_val, 0)
         self.assertEqual(self.interface.update_val, 0)
-        self.assertEqual(self.interface.finalize_val, 0)
 
         self.trainer.train(self.loader, num_epochs=epochs,
                            val_dataloader=self.loader)
 
-        # account for val fwd steps
-        self.assertEqual(self.interface.fwd, 3*epochs*len(self.data))
+        self.assertEqual(self.interface.fwd, 2*epochs*len(self.data))
         self.assertEqual(self.interface.bwd, 2*epochs*len(self.data))
         self.assertEqual(self.interface.init_val, epochs)
         self.assertEqual(self.interface.update_val, epochs*len(self.data))
-        self.assertEqual(self.interface.finalize_val, epochs)

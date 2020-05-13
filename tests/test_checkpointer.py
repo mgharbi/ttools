@@ -115,9 +115,9 @@ class TestCheckpointingCallback(unittest.TestCase):
 
         # Two batches in the interval
         time.sleep(2*interval)
-        cb.batch_end(None, None, None)
+        cb.batch_end(None, None)
         time.sleep(2*interval)
-        cb.batch_end(None, None, None)
+        cb.batch_end(None, None)
 
         chkpts = chkpt.sorted_checkpoints()
         self.assertEqual(len(chkpts), 2)
@@ -131,9 +131,9 @@ class TestCheckpointingCallback(unittest.TestCase):
 
         # Two batches in the interval
         time.sleep(1)
-        cb.batch_end(None, None, None)
+        cb.batch_end(None, None)
         time.sleep(1)
-        cb.batch_end(None, None, None)
+        cb.batch_end(None, None)
 
         # There should be no periodic checkpoints
         chkpts = chkpt.sorted_checkpoints()
@@ -146,20 +146,20 @@ class TestCheckpointingCallback(unittest.TestCase):
         cb = CheckpointingCallback(chkpt, max_files=10, max_epochs=None,
                                    interval=interval)
         cb2 = CheckpointingCallback(chkpt2, max_files=1, max_epochs=None,
-                                   interval=interval)
+                                    interval=interval)
         chkpts = chkpt.sorted_checkpoints()
         self.assertFalse(chkpts)  # check is empty
 
         # Three batches in the interval
         time.sleep(2*interval)
-        cb.batch_end(None, None, None)
-        cb2.batch_end(None, None, None)
+        cb.batch_end(None, None)
+        cb2.batch_end(None, None)
         time.sleep(2*interval)
-        cb.batch_end(None, None, None)
-        cb2.batch_end(None, None, None)
+        cb.batch_end(None, None)
+        cb2.batch_end(None, None)
         time.sleep(2*interval)
-        cb.batch_end(None, None, None)
-        cb2.batch_end(None, None, None)
+        cb.batch_end(None, None)
+        cb2.batch_end(None, None)
 
         # Make sure we have the right count in the comparison chkpt
         chkpts = chkpt.sorted_checkpoints()
@@ -168,7 +168,6 @@ class TestCheckpointingCallback(unittest.TestCase):
         # Make sure 2 is properly capped
         chkpts = chkpt2.sorted_checkpoints()
         self.assertEqual(len(chkpts), 1)
-
 
     def testEpochCheckpoints(self):
         chkpt = Checkpointer(self.root)
@@ -189,7 +188,6 @@ class TestCheckpointingCallback(unittest.TestCase):
         chkpts = chkpt.sorted_checkpoints()
         self.assertEqual(len(chkpts), 4)
 
-
     def testCappedEpochCheckpoints(self):
         chkpt = Checkpointer(self.root)
         chkpt2 = Checkpointer(self.root2)
@@ -198,7 +196,7 @@ class TestCheckpointingCallback(unittest.TestCase):
                                    interval=interval)
         interval = 0.5  # checkpoint every x seconds
         cb2 = CheckpointingCallback(chkpt2, max_files=1, max_epochs=3,
-                                   interval=interval)
+                                    interval=interval)
 
         chkpts = chkpt.sorted_checkpoints()
         self.assertFalse(chkpts)  # check is empty
