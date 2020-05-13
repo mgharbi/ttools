@@ -609,7 +609,7 @@ class ImageDisplayCallback(Callback, abc.ABC):
             return
 
         caption = self.caption(batch, running_val_data, is_val=True)
-        opts = {"caption": "Validation {}, batch {}: {}".format(
+        opts = {"caption": "Validation {}: {}".format(
             self.epoch, self.batch, caption)}
 
         viz = self.visualized_image(batch, running_val_data, is_val=True)

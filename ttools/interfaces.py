@@ -89,9 +89,25 @@ class GANInterface(ModelInterface, abc.ABC):
         else:
             raise ValueError("invalid optimizer %s" % opt)
 
+    def training_step(self, batch):
+        fwd_data = self.forward(batch)
+
+        if not isinstance(fwd_data, dict):
+            raise ValueError("Method `forward` should return a dict")
+
+        bwd_data = self.backward(batch, fwd_data)
+
+        if not isinstance(bwd_data, dict):
+            raise ValueError("Method `forward` should return a dict")
+
+        return dict(**fwd_data, **bwd_data)
+
     @abc.abstractmethod
     def forward(self, batch):
         """Abstract method that computes the generator output.
+
+        Returns:
+            dict of outputs
 
         Implement in derived classes.
         """
