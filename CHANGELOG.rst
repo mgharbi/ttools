@@ -1,4 +1,10 @@
-0.0.36
+0.1.0
+-----
+
+- Breaking changes in the ModelInterface and Callback API:
+  - replaces forward/backward methods and update_validation with training_step, validation_step.
+
+t0.0.36
 ------
 
 - Adds a scheduler callback and option to save its state in the callback
