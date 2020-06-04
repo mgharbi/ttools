@@ -69,7 +69,7 @@ class ModelInterface(metaclass=ABCMeta):
 
         This should implement a forward pass of the model, compute gradients,
         take an optimizer step and return useful metrics and tensors for
-        visualization and training callbacks. 
+        visualization and training callbacks.
 
         Args:
           batch (dict): batch of data provided by a data pipeline.
@@ -168,7 +168,7 @@ class Trainer(object):
         if starting_epoch is None:
             starting_epoch = 0
 
-        LOG.info("Starting taining from epoch %d", starting_epoch)
+        LOG.info("Starting training from epoch %d", starting_epoch)
 
         epoch = starting_epoch
 
