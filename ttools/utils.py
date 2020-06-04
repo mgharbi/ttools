@@ -3,17 +3,20 @@ import time
 
 import torch as th
 import numpy as np
+import imageio
 
 import logging
 try:
     import coloredlogs
     coloredlogs.install()
     HAS_COLORED_LOGS = True
-except:
+except ImportError:
     HAS_COLORED_LOGS = False
 
 
-__all__ = ["ExponentialMovingAverage", "Averager", "Timer", "tensor2image", "get_logger", "set_logger"]
+__all__ = ["ExponentialMovingAverage", "Averager", "Timer",
+           "tensor2image", "get_logger", "set_logger",
+           "imread"]
 
 
 def set_logger(debug=False):
@@ -46,8 +49,6 @@ def get_logger(name):
         name(string): name of the logger
     """
     return logging.getLogger(name)
-
-
 
 
 class ExponentialMovingAverage(object):
@@ -123,7 +124,6 @@ def tensor2image(t, normalize=False, dtype=np.uint8):
         M = t.max()
         t = (t-m) / (M-m+1e-8)
 
-
     t = th.clamp(t.permute(1, 2, 0), 0, 1).cpu().detach().numpy()
 
     if dtype == np.uint8:
@@ -132,6 +132,23 @@ def tensor2image(t, normalize=False, dtype=np.uint8):
         return ((2**16-1)*t).astype(np.uint16)
     else:
         raise ValueError("dtype %s not recognized" % dtype)
+
+
+def imread(path):
+    im = np.array(imageio.imread(path))
+    dtype = im.dtype
+
+    im = th.from_numpy(im.astype(np.float32))
+    if len(im.shape) == 2:  # gray
+        im = im.unsqueeze(0)
+    else:
+        im = im.permute(2, 0, 1)
+
+    if dtype == np.uint8:
+        im  = im / 255.0
+    elif dtype == np.uint16:
+        im  = im / (2**16-1)
+    return im
 
 
 class Timer(object):

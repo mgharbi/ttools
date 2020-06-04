@@ -287,7 +287,8 @@ class Checkpointer(object):
         # TODO(mgharbi): verify the prefixes are unique.
 
         if optimizers is None:
-            LOG.warning("No optimizer state will be stored in the checkpointer")
+            LOG.info("No optimizer state will be stored in the "
+                        "checkpointer")
         else:
             # if we have only one optimizer, make it a list
             if not isinstance(optimizers, list):
@@ -486,7 +487,8 @@ class Checkpointer(object):
             prefix(str): unique prefix for the checkpoint to be loaded (e.g. if
                 multiple models are saved in the same location)
         """
-        chkptr = Checkpointer(root, model=None, meta=None, prefix=prefix)
+        chkptr = Checkpointer(root, model=None, meta=None, prefix=prefix, 
+                              optimizers=[])
         LOG.debug("checkpoints: %s", chkptr.sorted_checkpoints())
         _, meta = chkptr.load_latest()
         return meta

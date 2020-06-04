@@ -141,7 +141,6 @@ class GaussianBlur(th.nn.Module):
 #     return x
 
 
-
 class BilinearUpsampler(th.nn.Module):
   def __init__(self, scale=2, channels=1):
     super(BilinearUpsampler, self).__init__()
