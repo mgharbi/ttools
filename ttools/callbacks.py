@@ -158,7 +158,7 @@ class KeyedCallback(Callback):
             self.keys = keys
 
         if val_keys is None:
-            self.val_keys = [] 
+            self.val_keys = []
         else:
             self.val_keys = val_keys
 
@@ -184,7 +184,7 @@ class VisdomLoggingCallback(KeyedCallback):
         0.0 disables smoothing.
     """
 
-    def __init__(self, keys=None, val_keys=None, frequency=100, server=None, 
+    def __init__(self, keys=None, val_keys=None, frequency=100, server=None,
                  port=8097, base_url="/", env="main", log=False, smoothing=0.99):
         super(VisdomLoggingCallback, self).__init__(
             keys=keys, val_keys=val_keys, smoothing=smoothing)
@@ -460,14 +460,23 @@ class CheckpointingCallback(Callback):
 
     PERIODIC_PREFIX = "periodic_"
     EPOCH_PREFIX = "epoch_"
+    BEST_MODEL_FILENAME = "best"
 
     def __init__(self, checkpointer, interval=600,
-                 max_files=5, max_epochs=10):
+                 max_files=5, max_epochs=10,
+                 best_val_key=None, best_val_value=None):
         super(CheckpointingCallback, self).__init__()
         self.checkpointer = checkpointer
         self.interval = interval
         self.max_files = max_files
         self.max_epochs = max_epochs
+        self.best_val_key = best_val_key
+
+        if best_val_value is not None:
+            LOG.info("Loaded best model ({}={})".format(best_val_key, best_val_value))
+            self.best_val_value = best_val_key
+        else:
+            self.best_val_value = float('inf')
 
         self.last_checkpoint_time = time.time()
 
@@ -505,6 +514,22 @@ class CheckpointingCallback(Callback):
                                    time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime()))
         self.checkpointer.save(filename, extras={"epoch": self.epoch})
         self.__purge_old_files()
+
+    def validation_end(self, val_data):
+        """Save a best model checkpoint if value for best_val_key is lowest so far."""
+
+        super(CheckpointingCallback, self).validation_end(val_data)
+
+        if self.best_val_key is None:
+            return
+        if val_data[self.best_val_key] > self.best_val_value:
+            return
+
+        self.best_val_value = val_data[self.best_val_key]
+
+        LOG.debug("Best model checkpoint ({}={})".format(self.best_val_key, self.best_val_value))
+        self.checkpointer.save(CheckpointingCallback.BEST_MODEL_FILENAME,
+                               extras={"epoch": self.epoch, "best_val_value": self.best_val_value})
 
     def __purge_old_files(self):
         """Delete checkpoints that are beyond the max to keep."""
@@ -635,7 +660,7 @@ class ExperimentLoggerCallback(Callback):
         print("end logging experiment", self.epoch, self.batch)
 
     def _get_commit(self):
-       return subprocess.check_output(["git", "rev-parse", "HEAD"]) 
+       return subprocess.check_output(["git", "rev-parse", "HEAD"])
 
 
 class CSVLoggingCallback(KeyedCallback):
