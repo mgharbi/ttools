@@ -65,7 +65,7 @@ class TestSQLLoggingCallback(unittest.TestCase):
             # if session == 1:
             #     keys.append("some_new_key")
             cb = callbacks.SQLLoggingCallback(self.outdir, keys=keys,
-                                              val_keys=val_keys)
+                                              val_keys=val_keys, frequency=1)
             cb.training_start([])
             for epoch in range(2):
                 cb.epoch_start(epoch)

@@ -665,8 +665,8 @@ class SQLLoggingCallback(KeyedCallback):
     """
     RESERVED_KEYS = ["timestamp", "event", "step"]
 
-    def __init__(self, root, name=None, keys=None, val_keys=None, frequency=1,
-                 smoothing=0):
+    def __init__(self, root, name=None, keys=None, val_keys=None,
+                 frequency=100, smoothing=0):
         # No smoothing by default
         super(SQLLoggingCallback, self).__init__(
             keys=keys, val_keys=val_keys, smoothing=smoothing)
