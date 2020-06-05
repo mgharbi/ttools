@@ -48,6 +48,7 @@ setuptools.setup(
         "imageio",
         "imageio-ffmpeg",
         "jinja2",
+        "seaborn",
         "sqlalchemy",
     ],
     classifiers=[

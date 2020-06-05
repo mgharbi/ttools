@@ -14,7 +14,7 @@ import pandas as pd
 import torch as th
 
 from ttools import callbacks
-
+from ttools import database
 
 class TestLoggingCallback(unittest.TestCase):
     def setUp(self):
@@ -89,7 +89,9 @@ class TestSQLLoggingCallback(unittest.TestCase):
             if session == 0:
                 del cb
 
-        db = callbacks.SQLiteDatabase(os.path.join(self.outdir, "logs.sqlite"))
+        db = database.SQLiteDatabase(os.path.join(self.outdir, "logs.sqlite"))
+        print(self.outdir)
+        import ipdb; ipdb.set_trace()
         # print()
         # print(db.read_table("events"))
         # print(db.read_table("logs"))

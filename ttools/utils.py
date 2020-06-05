@@ -1,11 +1,15 @@
 """Helpers classes and functions."""
 import time
+import os
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 import torch as th
 import numpy as np
 import imageio
 
 import logging
+
 try:
     import coloredlogs
     coloredlogs.install()
@@ -13,10 +17,11 @@ try:
 except ImportError:
     HAS_COLORED_LOGS = False
 
+from . import database
 
 __all__ = ["ExponentialMovingAverage", "Averager", "Timer",
            "tensor2image", "get_logger", "set_logger",
-           "imread"]
+           "imread", "get_logs", "plot_logs"]
 
 
 def set_logger(debug=False):
@@ -135,6 +140,14 @@ def tensor2image(t, normalize=False, dtype=np.uint8):
 
 
 def imread(path):
+    """Reads an 8- or 16-bits image at path.
+
+    Args:
+        path(str): path to image file.
+
+    Returns:
+        np.ndarray of the proper type.
+    """
     im = np.array(imageio.imread(path))
     dtype = im.dtype
 
@@ -149,6 +162,52 @@ def imread(path):
     elif dtype == np.uint16:
         im  = im / (2**16-1)
     return im
+
+
+def get_logs(path):
+    """Fetches logs from a .sqlite database."""
+    dbs = []
+    if os.path.isdir(path):
+        # search for default logs
+        for f in os.listdir(path):
+            if os.path.splitext(f)[-1] != ".sqlite":
+                continue
+            dbs.append(os.path.join(path, f))
+        if len(dbs) > 1:
+            msg = "Found %d .sqlite databases, "
+            "please specify the exact path" % len(dbs)
+            raise RuntimeError(msg)
+        path = dbs[0]
+    else:
+        db = path
+
+    db = database.SQLiteDatabase(path)
+    events = db.read_table("events")
+    logs = db.read_table("logs")
+    val_logs = db.read_table("val_logs")
+    return events, logs, val_logs
+
+
+def plot_logs(path, outpath, key="loss"):
+    # TODO: add log-scale, annotations, smoothing
+    """Plot logs from a .sqlite database."""
+    events, logs, val_logs = get_logs(path)
+
+    sns.set()
+    plt.clf()
+    if key in logs.keys():
+        sns.lineplot(x="step", y=key, data=logs)
+    if key in val_logs.keys():
+        sns.lineplot(x="step", y=key, data=val_logs)
+    plt.legend(["train", "val"])
+
+    training_end = events[events["event"]=="training_end"]["step"].tolist()
+
+    for e in training_end:
+        plt.axvline(e, c=[0.4, 0.1, 0.2])
+
+    plt.title("%s vs. optimization step", key)
+    plt.savefig(outpath)
 
 
 class Timer(object):
