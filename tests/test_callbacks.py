@@ -9,10 +9,11 @@ import string
 import time
 import unittest
 import logging
+import pandas as pd
 
 import torch as th
 
-from ttools.callbacks import *
+from ttools import callbacks
 
 
 class TestLoggingCallback(unittest.TestCase):
@@ -33,15 +34,63 @@ class TestLoggingCallback(unittest.TestCase):
         self.capture.close()
 
     def testBatchLogging(self):
-        cb = LoggingCallback(self.loggername, keys=["loss", "acc"], frequency=1)
+        cb = callbacks.LoggingCallback(self.loggername, keys=["loss", "acc"], frequency=1)
         bwd = dict(loss=0.01, acc=0.99)
         cb.batch_end(None, bwd)
         log_contents = self.capture.getvalue()
         self.assertEqual(log_contents, "INFO, Step 1.1 | loss = 0.01 | acc = 0.99\n")
 
     def testNoneLogging(self):
-        cb = LoggingCallback(self.loggername, keys=["loss", "acc"], frequency=1)
+        cb = callbacks.LoggingCallback(self.loggername, keys=["loss", "acc"], frequency=1)
         bwd = dict(loss=None, acc=0.99)
         cb.batch_end(None, bwd)
         log_contents = self.capture.getvalue()
         self.assertEqual(log_contents, "INFO, Step 1.1 | acc = 0.99\n")
+
+
+class TestSQLLoggingCallback(unittest.TestCase):
+    def setUp(self):
+        self.outdir = tempfile.mkdtemp()
+        # self.assertRaises
+
+    # TODO:
+    # test wrong extension
+    # test full train loop
+
+    def testLogging(self):
+        for session in range(2):  # simulate a stop and resume
+            keys = ["loss", "accuracy"]
+            val_keys = ["accuracy"]
+            # new key added in second session
+            # if session == 1:
+            #     keys.append("some_new_key")
+            cb = callbacks.SQLLoggingCallback(self.outdir, keys=keys,
+                                              val_keys=val_keys)
+            cb.training_start([])
+            for epoch in range(2):
+                cb.epoch_start(epoch)
+                for i in range(3):
+                    batch_data = None
+                    train_step_data = {
+                        "loss": i,
+                        "accuracy": random.random(),
+                        "some_new_key": 5,
+                    }
+                    cb.batch_start(i, batch_data)
+                    cb.batch_end(batch_data, train_step_data)
+                    # time.sleep(.1)
+                cb.epoch_end()
+                val_data = {
+                    "accuracy": random.random(),
+                }
+                cb.validation_end(val_data)
+            cb.training_end()
+
+            if session == 0:
+                del cb
+
+        db = callbacks.SQLiteDatabase(os.path.join(self.outdir, "logs.sqlite"))
+        # print()
+        # print(db.read_table("events"))
+        # print(db.read_table("logs"))
+        # print(db.read_table("val_logs"))

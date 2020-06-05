@@ -48,6 +48,7 @@ setuptools.setup(
         "imageio",
         "imageio-ffmpeg",
         "jinja2",
+        "sqlalchemy",
     ],
     classifiers=[
         "Development Status :: 3 - Alpha",

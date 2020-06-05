@@ -1,14 +1,15 @@
 """Callbacks that can be added to a model trainer's main loop."""
-# TODO: implement experiment logger
-# TODO: implement csv logger
-
+import os
 import abc
 import logging
 import random
 import string
 import subprocess
+import datetime
 import time
 import numpy as np
+import sqlalchemy as db
+import pandas as pd
 
 from tqdm import tqdm
 from torchvision.utils import make_grid
@@ -145,20 +146,23 @@ class KeyedCallback(Callback):
     validation_data) produced by a ModelInterface.
 
     Args:
-      keys (list of str): list of keys whose values will be logged during training. Defaults
-        to ["loss"].
-      val_keys (list of str): list of keys whose values will be logged during validation
+      keys (list of str or None): list of keys whose values will be logged during
+          training.
+      val_keys (list of str or None): list of keys whose values will be logged during
+          validation
     """
-
     def __init__(self, keys=None, val_keys=None, smoothing=0.999):
         super(KeyedCallback, self).__init__()
+        if keys is None and val_keys is None:
+            LOG.warning("Logger has no keys, nor val_keys")
+
         if keys is None:
-            self.keys = ["loss"]
+            self.keys = []
         else:
             self.keys = keys
 
         if val_keys is None:
-            self.val_keys = [] 
+            self.val_keys = []
         else:
             self.val_keys = val_keys
 
@@ -184,7 +188,7 @@ class VisdomLoggingCallback(KeyedCallback):
         0.0 disables smoothing.
     """
 
-    def __init__(self, keys=None, val_keys=None, frequency=100, server=None, 
+    def __init__(self, keys=None, val_keys=None, frequency=100, server=None,
                  port=8097, base_url="/", env="main", log=False, smoothing=0.99):
         super(VisdomLoggingCallback, self).__init__(
             keys=keys, val_keys=val_keys, smoothing=smoothing)
@@ -221,7 +225,7 @@ class VisdomLoggingCallback(KeyedCallback):
             return
         self._step = 0
 
-        t = self.batch / self.datasize + self.epoch
+        t = self.batch / max(self.datasize, 1) + self.epoch
 
         for k in self.keys:
             self._api.line([self.ema[k]], [t], update="append", win=k,
@@ -292,7 +296,7 @@ class MultiPlotCallback(KeyedCallback):
             return
         self._step = 0
 
-        t = self.batch / self.datasize + self.epoch
+        t = self.batch / max(self.datasize, 1) + self.epoch
 
         data = np.array([self.ema[k] for k in self.keys])
         data = np.expand_dims(data, 1)
@@ -618,67 +622,147 @@ class ImageDisplayCallback(Callback, abc.ABC):
         self.first_validation_step = False
 
 
-class ExperimentLoggerCallback(Callback):
-    """A callback that logs experiment parameters in a log."""
-
-    def __init__(self, fname, meta=None):
-        super(ExperimentLoggerCallback, self).__init__()
-        LOG.error("ExperimentLoggerCallback is not implemented yet")
-        raise NotImplementedError("ExperimentLoggerCallback is not implemented yet")
-
-    def training_start(self, dataloader):
-        super(ExperimentLoggerCallback, self).training_start(dataloader)
-        print("logging experiment with", self.datasize)
-
-    def training_end(self):
-        super(ExperimentLoggerCallback, self).training_end()
-        print("end logging experiment", self.epoch, self.batch)
-
-    def _get_commit(self):
-       return subprocess.check_output(["git", "rev-parse", "HEAD"]) 
-
-
-class CSVLoggingCallback(KeyedCallback):
-    """A callback that logs scalar quantities to a .csv file.
-
-    Format is:
-        epoch, step, event, key, value
-    """
-    def __init__(self, fname, keys=None, val_keys=None, smoothing=0):
-        super(CSVLoggingCallback, self).__init__(keys=keys, val_keys=val_keys, smoothing=smoothing)
-
-        LOG.error("CSVLoggingCallback is not implemented yet")
-        raise NotImplementedError("CSVLoggingCallback is not implemented yet")
-
+class SQLiteDatabase(object):
+    def __init__(self, fname):
+        fname = os.path.abspath(fname)
+        dirname = os.path.dirname(fname)
+        os.makedirs(dirname, exist_ok=True)
+        ext = os.path.splitext(fname)[-1]
+        if ext == "":
+            fname += ".sqlite"
+        else:
+            if ext != ".sqlite":
+                msg = "Expected .sqlite extension for database"
+                raise ValueError(msg)
         self.fname = fname
-        self.fid = open(self.fname, 'w')
 
-        self.fid.write("epoch, step, event, key, value\n")
-        self.fid.write(",,logger_created,,\n")
-
-
-        # open file, check last event
+        self.engine = db.create_engine('sqlite:///' + fname)
+        self.db_conn = self.engine.connect()
 
     def __del__(self):
-        LOG.info("deleting csv logger")
-        self.fid.write(",,logger_deleted,,\n")
-        self.fid.close()
+        self.db_conn.close()
+
+    def append_row(self, data, table_name):
+        """Appends a row of data to a database table.
+        Args:
+            data(dict): data to insert.
+            table_name(str): name of the table to update.
+        """
+
+        data = pd.DataFrame([data])
+        data.to_sql(
+            table_name, self.db_conn, if_exists="append", index=False)
+
+    def read_table(self, table_name):
+        try:
+            return pd.read_sql_table(table_name, self.db_conn)
+        except ValueError:  # no table found
+            return None
+
+
+class SQLLoggingCallback(KeyedCallback):
+    """A callback that logs scalar quantities to a .sqlite database.
+    """
+    RESERVED_KEYS = ["timestamp", "event", "step"]
+
+    def __init__(self, root, name=None, keys=None, val_keys=None, frequency=1,
+                 smoothing=0):
+        # No smoothing by default
+        super(SQLLoggingCallback, self).__init__(
+            keys=keys, val_keys=val_keys, smoothing=smoothing)
+
+        if name is None:
+            name = "logs"
+        name += ".sqlite"
+
+        self.frequency = frequency
+        self.db = SQLiteDatabase(os.path.join(root, name))
+
+        for k in keys:
+            if k in SQLLoggingCallback.RESERVED_KEYS:
+                msg = "Key '%s' is reserved, please use a different name" % k
+                LOG.error(msg)
+                raise ValueError(msg)
+
+        # Counts the total number of optimization steps (batches)
+        self.step = 0
+        
+        previous = self.db.read_table("events")
+        if previous is not None:
+            # print("previous table", previous)
+            training_end = previous[previous["event"]=="training_end"]
+            last = training_end.tail(1)
+            if not last.empty:
+                self.step = last["step"].item()
+
+        # TODO: update database with new keys if they are missing
+
+        # TODO: index can be 'step'
+
+    def _get_commit(self):
+       commit =  subprocess.check_output(["git", "rev-parse", "HEAD"])
+       return commit.strip()
+
+    def _save_to_db(self, data, table="logs"):
+        current_time = datetime.datetime.now()
+        data["timestamp"] = current_time
+        data["step"] = self.step
+        self.db.append_row(data, table)
 
     def batch_end(self, batch_data, train_step_data):
-        """Logs training advancement Batch"""
-        super(CSVLoggingCallback, self).batch_end(batch_data, train_step_data)
+        """Logs training advancement batch"""
+        super(SQLLoggingCallback, self).batch_end(batch_data, train_step_data)
 
-        for k in self.keys:
-            v = train_step_data[k]
-            self.fid.write("%d,%d,batch_end,%s,%f\n" % (self.epoch, self.batch, k, v))
+        # Allow subsampling of the data
+        if self.step % self.frequency == 0:
+            data = {k: train_step_data[k] for k in self.keys}
+            self._save_to_db(data)
+            print("save", self.step)
+
+        self.step += 1
 
     def training_start(self, dataloader):
-        super(CSVLoggingCallback, self).training_start(dataloader)
-        self.fid.write(",,training_start,,\n")
+        super(SQLLoggingCallback, self).training_start(dataloader)
+        data = {
+            "event": "training_start",
+            "git_commit": self._get_commit(),
+        }
+        self._save_to_db(data, table="events")
 
     def training_end(self):
-        super(CSVLoggingCallback, self).training_end()
-        self.fid.write(",,training_end,,\n")
+        super(SQLLoggingCallback, self).training_end()
+        data = {
+            "event": "training_end",
+            "git_commit": None,
+        }
+        self._save_to_db(data, table="events")
+
+    def validation_end(self, val_data):
+        super(SQLLoggingCallback, self).validation_end(val_data)
+        data = {k: val_data[k] for k in self.val_keys}
+        self._save_to_db(data, table="val_logs")
+
+        data = {
+            "event": "validation",
+            "git_commit": None,
+        }
+        self._save_to_db(data, table="events")
+
+    def epoch_start(self, epoch):
+        super(SQLLoggingCallback, self).epoch_start(epoch)
+        data = {
+            "event": "epoch_start",
+            "git_commit": None,
+        }
+        self._save_to_db(data, table="events")
+
+    def epoch_end(self):
+        super(SQLLoggingCallback, self).epoch_end()
+        data = {
+            "event": "epoch_end",
+            "git_commit": None,
+        }
+        self._save_to_db(data, table="events")
 
 
 def _random_string(size=16):
