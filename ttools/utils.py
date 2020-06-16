@@ -21,7 +21,7 @@ from . import database
 
 __all__ = ["ExponentialMovingAverage", "Averager", "Timer",
            "tensor2image", "get_logger", "set_logger",
-           "imread", "get_logs", "plot_logs"]
+           "imread", "imsave", "get_logs", "plot_logs"]
 
 
 def set_logger(debug=False):
@@ -137,6 +137,43 @@ def tensor2image(t, normalize=False, dtype=np.uint8):
         return ((2**16-1)*t).astype(np.uint16)
     else:
         raise ValueError("dtype %s not recognized" % dtype)
+
+
+def imsave(path, im, dtype="uint8"):
+    """Assumes [0,1] float images as input.
+
+    im can be a [bs, c, h, w] torch tensor or
+    a [h, w, 3], [h, w, 1] or [h, w] numpy array.
+    """
+
+    if dtype not in ["uint8", "uint16"]:
+        raise ValueError("Image type should be `uint8` or `uint16`")
+    if dtype == "uint8":
+        dtype = np.uint8
+        scale = 255
+    else:
+        dtype = np.uint16
+        scale = 2**16 - 1
+
+    if isinstance(im, th.Tensor):
+        im = im.detach()
+        if len(im.shape) == 4:  # bs, c, h, w
+            if im.shape[0] != 1:
+                raise ValueError("expected a single image, not a batch (got batch size %d)" % im.shape[0])
+            im = im.squeeze(0)
+        if len(im.shape) != 3 or im.shape[0] not in [1, 3]:
+            raise ValueError("got invalid image size %s" % im.shape)
+        im = im.permute(1, 2, 0)
+        # squeeze grayscale
+        im = im.squeeze(2)
+        im = im.cpu().numpy()
+    else:
+        if len(im.shape) == 3 and im.shape[0] not in [1, 3]:
+            raise ValueError("got invalid image size %s" % im.shape)
+
+    im = (np.clip(im, 0, 1) * scale).astype(dtype)
+
+    imageio.imwrite(path, im)
 
 
 def imread(path):
