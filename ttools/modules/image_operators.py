@@ -110,13 +110,11 @@ class ImageGradients(th.nn.Module):
 
       self.dx.weight.data.zero_()
       self.dx.weight.data[:, :, 0, 0]  = -1
-      self.dx.weight.data[:, :, 0, 1]  = 0
-      self.dx.weight.data[:, :, 0, 2]  = 1
+      self.dx.weight.data[:, :, 0, 1]  = 1
 
       self.dy.weight.data.zero_()
       self.dy.weight.data[:, :, 0, 0]  = -1
-      self.dy.weight.data[:, :, 1, 0]  = 0
-      self.dy.weight.data[:, :, 2, 0]  = 1
+      self.dy.weight.data[:, :, 1, 0]  = 1
 
     self.dx.weight.requires_grad = False
     self.dy.weight.requires_grad = False
