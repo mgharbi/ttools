@@ -1,3 +1,8 @@
+0.1.1
+-----
+
+- adds a "use_sobel" flag to derivative filter.
+
 0.1.0
 -----
 
