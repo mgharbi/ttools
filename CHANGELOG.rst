@@ -1,3 +1,9 @@
+0.1.3
+-----
+
+- Adds identity op so that padding can be turned on/off without weight loading
+  mismatch.
+
 0.1.2
 -----
 
