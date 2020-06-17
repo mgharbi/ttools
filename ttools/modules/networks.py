@@ -144,7 +144,7 @@ class ConvModule(nn.Module):
         use_bias_in_conv = norm_layer is None
 
         conv_pad = padding
-        if padding_mode == 'reflection':
+        if padding_mode == 'reflection' and padding > 0:
             self.add_module("reflection_pad", nn.ReflectionPad2d(padding))
             conv_pad = 0
         else:
