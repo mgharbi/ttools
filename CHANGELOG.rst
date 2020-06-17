@@ -1,3 +1,9 @@
+0.1.2
+-----
+
+- Adds reflection padding
+
+
 0.1.1
 -----
 

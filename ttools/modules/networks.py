@@ -121,12 +121,14 @@ class ConvModule(nn.Module):
       n_out(int): number of output channels.
       ksize(int): size of the convolution kernel (square).
       stride(int): downsampling factor
-      pad(bool): if True, zero pad the convolutions to maintain a constant size.
+      pad(bool): if True, pad the convolutions to maintain a constant size.
+      padding_mode(str): 'zero' or 'reflection'.
       activation(str): nonlinear activation function between convolutions.
       norm_layer(str): normalization to apply between the convolution modules.
     """
 
     def __init__(self, n_in, n_out, ksize=3, stride=1, pad=True,
+                 padding_mode='zero',
                  activation=None, norm_layer=None):
         super(ConvModule, self).__init__()
 
@@ -136,12 +138,21 @@ class ConvModule(nn.Module):
             n_out, int) and n_out > 0, "Output channels should be a positive integer got {}".format(n_out)
         assert isinstance(
             ksize, int) and ksize > 0, "Kernel size should be a positive integer got {}".format(ksize)
+        assert padding_mode in ["zero", "reflection"], "Invalid padding mode"
 
         padding = (ksize - 1) // 2 if pad else 0
         use_bias_in_conv = norm_layer is None
 
+        conv_pad = padding
+        if padding_mode == 'reflection':
+            self.add_module("reflection_pad", nn.ReflectionPad2d(padding))
+            conv_pad = 0
+        else:
+            self.add_module("no-op", nn.Identity())
+
         self.add_module("conv", nn.Conv2d(n_in, n_out, ksize, stride=stride,
-                                          padding=padding, bias=use_bias_in_conv))
+                                          padding=conv_pad,
+                                          bias=use_bias_in_conv))
 
         if norm_layer is not None:
             self.add_module("norm", _get_norm_layer(norm_layer, n_out))
@@ -168,11 +179,13 @@ class ConvChain(nn.Module):
       depth(int): number of layers
       strides(list of int): stride between kernels. If None, defaults to 1 for all.
       pad(bool): if True, zero pad the convolutions to maintain a constant size.
+      padding_mode(str): 'zero' or 'reflection'.
       activation(str): nonlinear activation function between convolutions.
       norm_layer(str): normalization to apply between the convolution modules.
     """
 
     def __init__(self, n_in, ksize=3, width=64, depth=3, strides=None, pad=True,
+                 padding_mode='zero',
                  activation="relu", norm_layer=None):
         super(ConvChain, self).__init__()
 
@@ -240,8 +253,9 @@ class ResidualBlock(nn.Module):
       pad(bool): if True, zero pad the convolutions to maintain a constant size.
     """
 
-    def __init__(self, n_features, ksize=3, n_convs=2, 
-                 activation=None, norm_layer=None, pad=True):
+    def __init__(self, n_features, ksize=3, n_convs=2,
+                 activation=None, norm_layer=None, pad=True,
+                 padding_mode='zero'):
         super(ResidualBlock, self).__init__()
 
         assert isinstance(n_features, int) and n_features > 0, \
@@ -259,8 +273,10 @@ class ResidualBlock(nn.Module):
         self.n_convs = n_convs
         self.convpath = th.nn.Sequential(
             ConvChain(n_features, ksize=ksize, width=n_features,
-                      depth=n_convs-1, pad=self.pad, activation=activation, norm_layer=norm_layer),
+                      depth=n_convs-1, pad=self.pad, padding_mode=padding_mode,
+                      activation=activation, norm_layer=norm_layer),
             ConvModule(n_features, n_features, ksize=ksize, stride=1, pad=self.pad,
+                       padding_mode=padding_mode,
                        activation=None, norm_layer=None)  # last layer has no activation
         )
 
@@ -288,10 +304,11 @@ class ResidualChain(nn.Module):
       activation(str): nonlinear activation function between convolutions.
       norm_layer(str): normalization to apply between the convolution modules.
       pad(bool): if True, zero pad the convolutions to maintain a constant size.
+      padding_mode(str): 'zero' or 'reflection'.
     """
 
     def __init__(self, n_features, ksize=3, depth=3, convs_per_block=2,
-                 activation="relu", norm_layer=None, pad=True):
+                 activation="relu", norm_layer=None, pad=True, padding_mode='zero'):
         super(ResidualChain, self).__init__()
         LOG.warning("ResidualChain has not been tested, beware!")
 
@@ -306,10 +323,11 @@ class ResidualChain(nn.Module):
         for lvl in range(depth):
             self.add_module(
                 "resblock{}".format(lvl),
-                ResidualBlock(n_features, ksize=ksize, 
-                              n_convs=convs_per_block, 
+                ResidualBlock(n_features, ksize=ksize,
+                              n_convs=convs_per_block,
                               activation=activation,
-                              norm_layer=norm_layer, pad=pad))
+                              norm_layer=norm_layer, pad=pad,
+                              padding_mode=padding_mode))
 
     def forward(self, x):
         for m in self.children():
@@ -330,12 +348,14 @@ class UNet(nn.Module):
       num_levels(int): number of scales
       activation(str): nonlinear activation function between convolutions.
       norm_layer(str): normalization to apply between the convolution modules.
+      pad(bool): if True, pad the convolutions to maintain a constant size.
     """
     def _width(self, lvl):
         return int(min(self.base_width*self.increase_factor**(lvl), self.max_width))
 
     def __init__(self, n_in, n_out, ksize=3, base_width=64, max_width=512, increase_factor=2,
                  num_convs=1, num_levels=4, activation="relu", norm_layer=None,
+                 padding_mode='zero',
                  interp_mode="bilinear"):
         super(UNet, self).__init__()
 
@@ -360,7 +380,7 @@ class UNet(nn.Module):
             u_lvl = UNet._UNetLevel(
                 lvl_in, lvl_out, lvl_w, ksize, num_convs, activation,
                 norm_layer, child=child, n_child_out=n_child_out,
-                interp_mode=interp_mode)
+                interp_mode=interp_mode, padding_mode=padding_mode)
             child = u_lvl
         self.top_level = u_lvl
 
@@ -369,9 +389,11 @@ class UNet(nn.Module):
 
     class _UNetLevel(nn.Module):
         def __init__(self, n_in, n_out, width, ksize, num_convs, activation,
-                     norm_layer, child=None, n_child_out=0, interp_mode="bilinear"):
+                     norm_layer, child=None, n_child_out=0, interp_mode="bilinear",
+                     padding_mode='zero'):
             super(UNet._UNetLevel, self).__init__()
-            self.left = ConvChain(n_in, ksize=ksize, width=width, depth=num_convs, pad=True,
+            self.left = ConvChain(n_in, ksize=ksize, width=width, depth=num_convs,
+                                  pad=True, padding_mode=padding_mode,
                                   activation=activation, norm_layer=norm_layer)
             w = [width] * (num_convs-1) + [n_out]
             self.right = ConvChain(width + n_child_out, ksize=ksize, width=w, depth=num_convs, pad=True,
@@ -382,6 +404,7 @@ class UNet(nn.Module):
         def forward(self, x):
             left_features = self.left(x)
             if self.child is not None:
+                # TODO: use our interpolation
                 ds = nn.functional.interpolate(
                     left_features, scale_factor=0.5, mode=self.interp_mode, align_corners=True)
                 child_features = self.child(ds)
@@ -438,16 +461,18 @@ class FixupBasicBlock(nn.Module):
     # https://openreview.net/pdf?id=H1gsz30cKX
     expansion = 1
 
-    def __init__(self, n_features, ksize=3, pad=True, activation="relu"):
+    def __init__(self, n_features, ksize=3, pad=True, padding_mode='zero', activation="relu"):
         super(FixupBasicBlock, self).__init__()
         self.bias1a = nn.Parameter(th.zeros(1))
         self.conv1 = ConvModule(n_features, n_features, ksize=ksize, stride=1,
-                                pad=pad, activation=None, norm_layer=None)
+                                pad=pad, activation=None, norm_layer=None,
+                                padding_mode=padding_mode)
         self.bias1b = nn.Parameter(th.zeros(1))
         self.activation = _get_activation(activation)
         self.bias2a = nn.Parameter(th.zeros(1))
         self.conv2 = ConvModule(n_features, n_features, ksize=ksize, stride=1,
-                                pad=pad, activation=None, norm_layer=None)
+                                pad=pad, activation=None, norm_layer=None,
+                                padding_mode=padding_mode)
         self.scale = nn.Parameter(th.ones(1))
         self.bias2b = nn.Parameter(th.zeros(1))
         self.activation2 = _get_activation(activation)
@@ -484,10 +509,11 @@ class FixupResidualChain(nn.Module):
       activation(str): nonlinear activation function between convolutions.
       norm_layer(str): normalization to apply between the convolution modules.
       pad(bool): if True, zero pad the convs to maintain a constant size.
+      padding_mode(str): 'zero' or 'reflection'.
     """
 
     def __init__(self, n_features, depth=3, ksize=3, activation="relu",
-                 norm_layer=None, pad=True):
+                 norm_layer=None, pad=True, padding_mode='zero'):
         super(FixupResidualChain, self).__init__()
 
         assert isinstance(
@@ -504,7 +530,8 @@ class FixupResidualChain(nn.Module):
         for lvl in range(depth):
             blockname = "resblock{}".format(lvl)
             layers[blockname] = FixupBasicBlock(
-                n_features, ksize=ksize, activation=activation, pad=pad)
+                n_features, ksize=ksize, activation=activation, pad=pad,
+                padding_mode=padding_mode)
 
         self.net = nn.Sequential(layers)
 
