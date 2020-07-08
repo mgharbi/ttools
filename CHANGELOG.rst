@@ -1,3 +1,8 @@
+0.1.4
+-----
+
+- Adds a label to progress bar
+
 0.1.3
 -----
 

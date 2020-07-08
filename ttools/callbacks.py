@@ -394,12 +394,20 @@ class LoggingCallback(KeyedCallback):
 
 
 class ProgressBarCallback(KeyedCallback):
-    """A progress bar optimization logger."""
+    """A progress bar optimization logger.
 
-    def __init__(self, keys=None, val_keys=None, smoothing=0.99):
+    Args:
+        label(str): a prefix label to identify the experiment currently
+            running.
+    """
+    def __init__(self, keys=None, val_keys=None, smoothing=0.99, label=None):
         super(ProgressBarCallback, self).__init__(
             keys=keys, val_keys=val_keys, smoothing=smoothing)
         self.pbar = None
+        if label is None:
+            self.label = ""
+        else:
+            self.label = label
 
     def training_start(self, dataloader):
         super(ProgressBarCallback, self).training_start(dataloader)
@@ -411,8 +419,11 @@ class ProgressBarCallback(KeyedCallback):
 
     def epoch_start(self, epoch):
         super(ProgressBarCallback, self).epoch_start(epoch)
+        desc = "Epoch {}".format(self.epoch)
+        if self.label is not None:
+            desc = "%s | " % self.label + desc
         self.pbar = tqdm(total=self.datasize, unit=" batches",
-                         desc="Epoch {}".format(self.epoch))
+                         desc=desc)
 
     def epoch_end(self):
         super(ProgressBarCallback, self).epoch_end()
