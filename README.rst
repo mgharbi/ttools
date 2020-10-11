@@ -1,7 +1,7 @@
 Readme
 ======
 
-![pylint](https://github.com/mgharbi/tools/workflows/pylint/badge.svg)
+![pylint](https://github.com/mgharbi/tools/workflows/pylint.yml/badge.svg)
 
 A library of helpers for PyTorch.
 
