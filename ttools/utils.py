@@ -12,7 +12,6 @@ import logging
 
 try:
     import coloredlogs
-    coloredlogs.install()
     HAS_COLORED_LOGS = True
 except ImportError:
     HAS_COLORED_LOGS = False
@@ -37,6 +36,7 @@ def set_logger(debug=False):
     if debug:
         log_level = logging.DEBUG
         prefix += " %(filename)s:%(lineno)s"
+
     if HAS_COLORED_LOGS:
         coloredlogs.install(
             level=log_level,
