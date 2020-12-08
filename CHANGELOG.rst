@@ -1,3 +1,8 @@
+0.1.5
+-----
+
+- Remove coloredlogs by default
+
 0.1.4
 -----
 
