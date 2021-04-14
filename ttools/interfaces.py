@@ -98,7 +98,7 @@ class GANInterface(ModelInterface, abc.ABC):
         bwd_data = self.backward(batch, fwd_data)
 
         if not isinstance(bwd_data, dict):
-            raise ValueError("Method `forward` should return a dict")
+            raise ValueError("Method `backward` should return a dict")
 
         return dict(**fwd_data, **bwd_data)
 
